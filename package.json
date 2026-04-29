@@ -33,12 +33,15 @@
     "wait-on": "^8.0.0"
   },
   "build": {
+    "afterPack": "scripts/afterPack.cjs",
     "appId": "app.tiltbreaker.desktop",
     "productName": "TiltBreaker",
     "directories": {
       "output": "release"
     },
     "files": [
+      "build/icon.ico",
+      "build/icon.png",
       "dist/**/*",
       "dist-electron/**/*",
       "package.json"

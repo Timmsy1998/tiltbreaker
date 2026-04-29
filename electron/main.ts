@@ -1,4 +1,15 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol, type OpenDialogOptions } from "electron";
+import {
+  app,
+  BrowserWindow,
+  Menu,
+  Tray,
+  dialog,
+  nativeImage,
+  nativeTheme,
+  protocol,
+  ipcMain,
+  type OpenDialogOptions
+} from "electron";
 import { join } from "node:path";
 import { LcuClient } from "./lcuClient";
 import { parseMatches } from "./matchParser";
@@ -38,9 +49,11 @@ protocol.registerSchemesAsPrivileged([
 const lcu = new LcuClient();
 let store: SessionStore;
 let mainWindow: BrowserWindow | undefined;
+let tray: Tray | undefined;
 let lcuStatus: LcuStatus = { connected: false };
 let queueGuard: QueueGuardState = { enabled: true, gate: "unavailable" };
 let pollTimer: NodeJS.Timeout | undefined;
+let isQuitting = false;
 
 async function createWindow() {
   mainWindow = new BrowserWindow({
@@ -49,6 +62,7 @@ async function createWindow() {
     minWidth: 1024,
     minHeight: 680,
     backgroundColor: "#101216",
+    icon: getIconPath("ico"),
     title: "TiltBreaker",
     webPreferences: {
       preload: join(__dirname, "preload.js"),
@@ -62,9 +76,19 @@ async function createWindow() {
   } else {
     await mainWindow.loadFile(join(__dirname, "../dist/index.html"));
   }
+
+  mainWindow.on("close", (event) => {
+    if (isQuitting) {
+      return;
+    }
+
+    event.preventDefault();
+    mainWindow?.hide();
+  });
 }
 
 app.whenReady().then(async () => {
+  app.setAppUserModelId("app.tiltbreaker.desktop");
   nativeTheme.themeSource = "dark";
   store = new SessionStore(join(app.getPath("userData"), "tiltbreaker-state.json"));
   lcu.setPreferredLockfilePath(store.settings.lockfilePath);
@@ -75,6 +99,7 @@ app.whenReady().then(async () => {
 
   registerIpc();
   registerAssetProtocol();
+  createTray();
   await createWindow();
   startPolling();
 
@@ -90,10 +115,54 @@ app.on("window-all-closed", () => {
     clearInterval(pollTimer);
   }
 
-  if (process.platform !== "darwin") {
+  if (isQuitting && process.platform !== "darwin") {
     app.quit();
   }
 });
+
+app.on("before-quit", () => {
+  isQuitting = true;
+});
+
+function createTray() {
+  const icon = nativeImage.createFromPath(getIconPath("png"));
+  tray = new Tray(icon);
+  tray.setToolTip("TiltBreaker");
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      {
+        label: "Show TiltBreaker",
+        click: showMainWindow
+      },
+      {
+        label: "Quit",
+        click: () => {
+          isQuitting = true;
+          app.quit();
+        }
+      }
+    ])
+  );
+  tray.on("click", showMainWindow);
+}
+
+function showMainWindow() {
+  if (!mainWindow) {
+    void createWindow();
+    return;
+  }
+
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function getIconPath(type: "ico" | "png") {
+  return join(__dirname, `../build/icon.${type}`);
+}
 
 function registerIpc() {
   ipcMain.handle("snapshot", () => snapshot());
