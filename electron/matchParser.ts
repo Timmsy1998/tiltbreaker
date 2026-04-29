@@ -1,3 +1,4 @@
+import { getQueueName } from "./queueRules";
 import type { MatchSummary, SummonerInfo } from "./types";
 
 interface LcuMatchHistoryResponse {
@@ -46,7 +47,11 @@ interface LcuIdentity {
   };
 }
 
-export function parseMatches(response: unknown, summoner: SummonerInfo | undefined) {
+export function parseMatches(
+  response: unknown,
+  summoner: SummonerInfo | undefined,
+  championNames = new Map<number, string>()
+) {
   const history = response as LcuMatchHistoryResponse | undefined;
   const games = history?.games?.games;
 
@@ -55,11 +60,15 @@ export function parseMatches(response: unknown, summoner: SummonerInfo | undefin
   }
 
   return games
-    .map((game) => parseGame(game as LcuGame, summoner))
+    .map((game) => parseGame(game as LcuGame, summoner, championNames))
     .filter((match): match is MatchSummary => Boolean(match));
 }
 
-function parseGame(game: LcuGame, summoner: SummonerInfo): MatchSummary | undefined {
+function parseGame(
+  game: LcuGame,
+  summoner: SummonerInfo,
+  championNames: Map<number, string>
+): MatchSummary | undefined {
   if (!game.gameId) {
     return undefined;
   }
@@ -74,18 +83,20 @@ function parseGame(game: LcuGame, summoner: SummonerInfo): MatchSummary | undefi
   const stats = participant.stats ?? {};
   const createdAt = parseCreatedAt(game);
   const championId = participant.championId ?? 0;
+  const queueId = game.queueId;
 
   return {
     assists: stats.assists ?? 0,
     championId,
-    championName: participant.championName ?? `Champion ${championId}`,
+    championName: participant.championName ?? championNames.get(championId) ?? `Champion ${championId}`,
     createdAt,
     deaths: stats.deaths ?? 0,
     durationSeconds: game.gameDuration ?? 0,
     gameId: game.gameId,
     gold: stats.goldEarned,
     kills: stats.kills ?? 0,
-    queueId: game.queueId,
+    queueId,
+    queueName: getQueueName(queueId),
     result: typeof stats.win === "boolean" ? (stats.win ? "win" : "loss") : "unknown",
     cs: (stats.totalMinionsKilled ?? 0) + (stats.neutralMinionsKilled ?? 0)
   };

@@ -47,9 +47,32 @@ export interface MatchSummary {
   gameId: number;
   kills: number;
   queueId?: number;
+  queueName?: string;
   result: "win" | "loss" | "unknown";
   cs?: number;
   gold?: number;
+}
+
+export interface RankedPosition {
+  division?: string;
+  leaguePoints: number;
+  queueName: string;
+  queueType: string;
+  score?: number;
+  tier?: string;
+}
+
+export interface RankedSnapshot {
+  capturedAt: number;
+  positions: RankedPosition[];
+  totalScore?: number;
+}
+
+export interface LpDayState {
+  current?: RankedSnapshot;
+  dateKey: string;
+  delta?: number;
+  start?: RankedSnapshot;
 }
 
 export interface SeriesState {
@@ -57,8 +80,26 @@ export interface SeriesState {
   breakUntil?: number;
   games: MatchSummary[];
   losses: number;
+  lpCurrent?: RankedSnapshot;
+  lpDelta?: number;
+  lpStart?: RankedSnapshot;
   startedAt?: number;
   status: "idle" | "active" | "break";
+  wins: number;
+}
+
+export interface CompletedSession {
+  bestOf: SeriesBestOf;
+  breakUntil?: number;
+  endedAt: number;
+  games: MatchSummary[];
+  id: string;
+  losses: number;
+  lpDelta?: number;
+  lpEnd?: RankedSnapshot;
+  lpStart?: RankedSnapshot;
+  result: "win" | "loss" | "incomplete";
+  startedAt: number;
   wins: number;
 }
 
@@ -74,6 +115,7 @@ export interface QueueContext {
   isSummonersRift: boolean;
   mapId?: number;
   mode?: string;
+  name?: string;
 }
 
 export interface QueueGuardState {
@@ -93,9 +135,12 @@ export interface LcuStatus {
 }
 
 export interface AppSnapshot {
+  completedSessions: CompletedSession[];
   lcu: LcuStatus;
+  lpDay?: LpDayState;
   now: number;
   queueGuard: QueueGuardState;
+  ranked?: RankedSnapshot;
   recentMatches: MatchSummary[];
   series: SeriesState;
   settings: TiltBreakerSettings;

@@ -13,7 +13,8 @@ import {
 import { join } from "node:path";
 import { LcuClient } from "./lcuClient";
 import { parseMatches } from "./matchParser";
-import { isSummonersRiftQueue } from "./queueRules";
+import { parseRankedSnapshot } from "./rankedParser";
+import { getQueueName, isSummonersRiftQueue } from "./queueRules";
 import { SessionStore } from "./sessionStore";
 import type {
   AppSnapshot,
@@ -31,6 +32,11 @@ interface LcuLobby {
     mapId?: number;
     queueId?: number;
   };
+}
+
+interface ChampionSummaryEntry {
+  id?: number;
+  name?: string;
 }
 
 protocol.registerSchemesAsPrivileged([
@@ -54,6 +60,8 @@ let lcuStatus: LcuStatus = { connected: false };
 let queueGuard: QueueGuardState = { enabled: true, gate: "unavailable" };
 let pollTimer: NodeJS.Timeout | undefined;
 let isQuitting = false;
+let championNames = new Map<number, string>();
+let championNamesLoadedAt = 0;
 
 async function createWindow() {
   mainWindow = new BrowserWindow({
@@ -246,9 +254,10 @@ async function pollLcu() {
   try {
     lcu.setPreferredLockfilePath(store.settings.lockfilePath);
 
-    const [summonerResult, phaseResult] = await Promise.allSettled([
+    const [summonerResult, phaseResult, rankedResult] = await Promise.allSettled([
       lcu.requestJson<SummonerInfo>("/lol-summoner/v1/current-summoner"),
-      lcu.requestJson<LcuPhase>("/lol-gameflow/v1/gameflow-phase")
+      lcu.requestJson<LcuPhase>("/lol-gameflow/v1/gameflow-phase"),
+      lcu.requestJson<unknown>("/lol-ranked/v1/current-ranked-stats")
     ]);
 
     if (summonerResult.status === "rejected" && phaseResult.status === "rejected") {
@@ -257,6 +266,8 @@ async function pollLcu() {
 
     const summoner = summonerResult.status === "fulfilled" ? summonerResult.value : undefined;
     const phase = phaseResult.status === "fulfilled" ? phaseResult.value : undefined;
+    const ranked =
+      rankedResult.status === "fulfilled" ? parseRankedSnapshot(rankedResult.value) : undefined;
 
     lcuStatus = {
       connected: true,
@@ -265,12 +276,15 @@ async function pollLcu() {
       summoner
     };
 
+    store.updateRanked(ranked);
+
     if (summoner) {
       try {
+        const names = await getChampionNames();
         const matchHistory = await lcu.requestJson<unknown>(
           "/lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex=12"
         );
-        store.mergeMatches(parseMatches(matchHistory, summoner));
+        store.mergeMatches(parseMatches(matchHistory, summoner, names));
       } catch {
         store.mergeMatches([]);
       }
@@ -332,7 +346,8 @@ async function getCurrentQueue(): Promise<QueueContext | undefined> {
       id: queueId,
       isSummonersRift: isSummonersRiftQueue(queueId, mapId),
       mapId,
-      mode: gameConfig.gameMode
+      mode: gameConfig.gameMode,
+      name: getQueueName(queueId)
     };
   } catch {
     return undefined;
@@ -384,4 +399,33 @@ function pushSnapshot() {
 
 function normalizeNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+async function getChampionNames() {
+  const staleAfterMs = 60 * 60 * 1000;
+
+  if (championNames.size && Date.now() - championNamesLoadedAt < staleAfterMs) {
+    return championNames;
+  }
+
+  try {
+    const response = await lcu.requestJson<unknown>("/lol-game-data/assets/v1/champion-summary.json");
+    const entries = Array.isArray(response) ? response : [];
+    const names = new Map<number, string>();
+
+    for (const entry of entries as ChampionSummaryEntry[]) {
+      if (typeof entry.id === "number" && entry.id >= 0 && entry.name) {
+        names.set(entry.id, entry.name);
+      }
+    }
+
+    if (names.size) {
+      championNames = names;
+      championNamesLoadedAt = Date.now();
+    }
+  } catch {
+    return championNames;
+  }
+
+  return championNames;
 }
