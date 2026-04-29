@@ -40,6 +40,6 @@ button {
 
 button:focus-visible,
 input:focus-visible {
-  outline: 2px solid #4da3ff;
+  outline: 2px solid #ff9f1a;
   outline-offset: 2px;
 }

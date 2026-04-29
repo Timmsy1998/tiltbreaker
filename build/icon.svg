@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="TiltBreaker icon">
-  <rect width="256" height="256" rx="48" fill="#101216"/>
-  <path d="M128 28 204 58v58c0 50-30 88-76 112-46-24-76-62-76-112V58l76-30Z" fill="#1b2027" stroke="#27c07d" stroke-width="10" stroke-linejoin="round"/>
-  <path d="M85 84h86v28h-28v72h-30v-72H85V84Z" fill="#eef2f3"/>
-  <path d="M80 190h96" stroke="#4da3ff" stroke-width="16" stroke-linecap="round"/>
-  <path d="M91 138h74" stroke="#e8aa3b" stroke-width="12" stroke-linecap="round"/>
-</svg>

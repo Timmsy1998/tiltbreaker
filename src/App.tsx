@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { AppSnapshot, MatchSummary, SeriesState } from "../electron/types";
+import tiltbreakerLogo from "./assets/tiltbreaker-logo.png";
+import tiltbreakerMark from "./assets/tiltbreaker-mark.png";
 
 const emptySnapshot: AppSnapshot = {
   lcu: {
@@ -86,19 +88,18 @@ export default function App() {
 
   return (
     <main className="min-h-screen bg-[#101216] text-ink">
-      <div className="grid min-h-screen grid-cols-[300px_minmax(0,1fr)]">
-        <aside className="border-r border-line bg-[#12151a] px-5 py-5">
-          <div className="flex items-center gap-3">
-            <div className="grid size-11 place-items-center rounded-lg border border-line bg-[#1b2027] text-good">
-              <ShieldCheck size={24} strokeWidth={2.2} />
-            </div>
-            <div>
-              <h1 className="text-2xl font-semibold leading-tight tracking-normal">TiltBreaker</h1>
-              <p className="text-sm text-muted">Queue smart. Not tilted.</p>
-            </div>
+      <div className="grid min-h-screen grid-cols-[320px_minmax(0,1fr)]">
+        <aside className="overflow-y-auto border-r border-line bg-[#111318] px-5 py-5">
+          <div className="relative overflow-hidden rounded-lg border border-[#34284a] bg-[#090a0d] p-2 shadow-[0_0_36px_rgba(255,159,26,0.10)]">
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brandPurple via-[#f1f1f1] to-brandOrange" />
+            <img
+              alt="TiltBreaker - Queue smart. Not tilted."
+              className="mx-auto block w-[216px]"
+              src={tiltbreakerLogo}
+            />
           </div>
 
-          <div className="mt-7 space-y-3">
+          <div className="mt-5 space-y-3">
             <StatusLine
               icon={snapshot.lcu.connected ? <Wifi size={18} /> : <WifiOff size={18} />}
               label="LCU"
@@ -119,14 +120,14 @@ export default function App() {
             />
           </div>
 
-          <section className="mt-7 border-t border-line pt-5">
+          <section className="mt-6 border-t border-line pt-5">
             <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">Session</h2>
             <div className="mt-3 grid grid-cols-3 gap-2">
               {breakOptions.map((minutes) => (
                 <button
                   className={`h-10 rounded-md border text-sm font-medium transition ${
                     snapshot.settings.breakMinutes === minutes
-                      ? "border-good bg-good/15 text-good"
+                      ? "border-brandOrange bg-brandOrange/15 text-brandOrange"
                       : "border-line bg-[#181c22] text-muted hover:border-[#3b4350] hover:text-ink"
                   }`}
                   key={minutes}
@@ -145,7 +146,7 @@ export default function App() {
               </span>
               <input
                 checked={snapshot.settings.queueGuardEnabled}
-                className="h-4 w-4 accent-good"
+                className="h-4 w-4 accent-brandOrange"
                 onChange={(event) =>
                   withSnapshot(window.tiltbreaker.updateSettings({ queueGuardEnabled: event.currentTarget.checked }))
                 }
@@ -154,24 +155,24 @@ export default function App() {
             </label>
           </section>
 
-          <section className="mt-7 border-t border-line pt-5">
+          <section className="mt-6 border-t border-line pt-5">
             <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">Client</h2>
             <button
-              className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-md border border-line bg-[#181c22] text-sm font-medium text-ink hover:border-[#3b4350]"
+              className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-md border border-line bg-[#181c22] text-sm font-medium text-ink hover:border-[#3b4350]"
               onClick={() => withSnapshot(window.tiltbreaker.selectLockfile())}
               type="button"
             >
               <FolderOpen size={17} />
               Lockfile
             </button>
-            <p className="mt-3 break-all text-xs leading-5 text-muted">
+            <p className="mt-2 max-h-10 overflow-hidden break-all text-xs leading-5 text-muted">
               {snapshot.lcu.lockfilePath ?? snapshot.settings.lockfilePath ?? "Auto discovery"}
             </p>
           </section>
         </aside>
 
         <section className="min-w-0">
-          <header className="flex min-h-[88px] items-center justify-between border-b border-line px-8">
+          <header className="flex min-h-[88px] items-center justify-between border-b border-line bg-[#111318] px-8">
             <div className="flex min-w-0 items-center gap-4">
               <ProfileIcon profileIconId={snapshot.lcu.summoner?.profileIconId} />
               <div className="min-w-0">
@@ -184,7 +185,7 @@ export default function App() {
 
             <div className="flex items-center gap-2">
               <button
-                className="flex h-10 items-center gap-2 rounded-md border border-good/40 bg-good/15 px-4 text-sm font-semibold text-good hover:border-good/70 disabled:cursor-not-allowed disabled:border-line disabled:bg-[#181c22] disabled:text-muted"
+                className="flex h-10 items-center gap-2 rounded-md border border-brandOrange/50 bg-brandOrange/15 px-4 text-sm font-semibold text-brandOrange hover:border-brandOrange disabled:cursor-not-allowed disabled:border-line disabled:bg-[#181c22] disabled:text-muted"
                 disabled={snapshot.series.status === "active"}
                 onClick={() => withSnapshot(window.tiltbreaker.startSeries())}
                 type="button"
@@ -276,10 +277,16 @@ function SeriesPanel({ breakRemaining, series }: { breakRemaining: number; serie
     series.status === "active" ? "Active BO3" : series.status === "break" ? "Break window" : "Ready";
 
   return (
-    <section className="rounded-lg border border-line bg-panel p-5">
-      <div className="flex items-start justify-between gap-5">
+    <section className="relative overflow-hidden rounded-lg border border-[#34284a] bg-panel p-5">
+      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brandPurple via-[#f1f1f1] to-brandOrange" />
+      <img
+        alt=""
+        className="pointer-events-none absolute -right-12 -top-20 w-[310px] opacity-[0.08]"
+        src={tiltbreakerMark}
+      />
+      <div className="relative flex items-start justify-between gap-5">
         <div>
-          <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.14em] text-muted">
+          <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.14em] text-brandOrange">
             <Clock3 size={16} />
             {statusLabel}
           </div>
@@ -302,7 +309,7 @@ function SeriesPanel({ breakRemaining, series }: { breakRemaining: number; serie
               match?.result === "win"
                 ? "border-good bg-good/15 text-good"
                 : match?.result === "loss"
-                  ? "border-bad bg-bad/15 text-bad"
+                  ? "border-brandPurple bg-brandPurple/15 text-brandPurple"
                   : "border-line bg-[#1b2027] text-muted";
 
             return (

@@ -19,6 +19,8 @@ module.exports = {
         ink: "#eef2f3",
         muted: "#8d96a3",
         line: "#2a3038",
+        brandPurple: "#8a3ffc",
+        brandOrange: "#ff9f1a",
         good: "#27c07d",
         warn: "#e8aa3b",
         bad: "#ec5f67",
