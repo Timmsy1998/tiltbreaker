@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { isSummonersRiftQueue } from "./queueRules";
 import type { AppSnapshot, MatchSummary, SeriesState, TiltBreakerSettings } from "./types";
 
 interface PersistedState {
@@ -17,7 +18,8 @@ const defaultState: PersistedState = {
     wins: 0
   },
   settings: {
-    breakMinutes: 90,
+    bestOf: 3,
+    breakMinutes: 60,
     queueGuardEnabled: true
   }
 };
@@ -72,6 +74,7 @@ export class SessionStore {
 
   startSeries() {
     this.state.series = {
+      bestOf: this.state.settings.bestOf,
       games: [],
       losses: 0,
       startedAt: Date.now(),
@@ -116,13 +119,17 @@ export class SessionStore {
       return;
     }
 
+    const bestOf = this.state.series.bestOf ?? this.state.settings.bestOf;
+    const targetWins = Math.ceil(bestOf / 2);
     const seriesMatches = uniqueMatches(
       matches
-        .filter((match) => match.createdAt >= (this.state.series.startedAt ?? 0))
-        .concat(this.state.series.games)
+        .filter(
+          (match) => match.createdAt >= (this.state.series.startedAt ?? 0) && isSummonersRiftQueue(match.queueId)
+        )
+        .concat(this.state.series.games.filter((match) => isSummonersRiftQueue(match.queueId)))
     )
       .sort((a, b) => a.createdAt - b.createdAt)
-      .slice(0, 3);
+      .slice(0, bestOf);
 
     const wins = seriesMatches.filter((match) => match.result === "win").length;
     const losses = seriesMatches.filter((match) => match.result === "loss").length;
@@ -134,7 +141,7 @@ export class SessionStore {
       losses
     };
 
-    if (wins >= 2 || losses >= 2 || seriesMatches.length >= 3) {
+    if (wins >= targetWins || losses >= targetWins || seriesMatches.length >= bestOf) {
       this.state.series = {
         ...this.state.series,
         breakUntil: Date.now() + this.state.settings.breakMinutes * 60 * 1000,

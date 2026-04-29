@@ -13,6 +13,7 @@ export type LcuPhase =
   | string;
 
 export type QueueGate = "open" | "closed" | "unavailable";
+export type SeriesBestOf = 3 | 5;
 
 export interface SummonerInfo {
   accountId?: number;
@@ -52,6 +53,7 @@ export interface MatchSummary {
 }
 
 export interface SeriesState {
+  bestOf?: SeriesBestOf;
   breakUntil?: number;
   games: MatchSummary[];
   losses: number;
@@ -61,12 +63,21 @@ export interface SeriesState {
 }
 
 export interface TiltBreakerSettings {
+  bestOf: SeriesBestOf;
   breakMinutes: number;
   lockfilePath?: string;
   queueGuardEnabled: boolean;
 }
 
+export interface QueueContext {
+  id?: number;
+  isSummonersRift: boolean;
+  mapId?: number;
+  mode?: string;
+}
+
 export interface QueueGuardState {
+  currentQueue?: QueueContext;
   enabled: boolean;
   gate: QueueGate;
   lastBlockedAt?: number;

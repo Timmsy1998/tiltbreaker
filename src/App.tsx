@@ -15,7 +15,7 @@ import {
   X
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import type { AppSnapshot, MatchSummary, SeriesState } from "../electron/types";
+import type { AppSnapshot, MatchSummary, SeriesBestOf, SeriesState } from "../electron/types";
 import tiltbreakerLogo from "./assets/tiltbreaker-logo.png";
 import tiltbreakerMark from "./assets/tiltbreaker-mark.png";
 
@@ -36,12 +36,14 @@ const emptySnapshot: AppSnapshot = {
     wins: 0
   },
   settings: {
-    breakMinutes: 90,
+    bestOf: 3,
+    breakMinutes: 60,
     queueGuardEnabled: true
   }
 };
 
-const breakOptions = [60, 90, 120];
+const seriesOptions = [3, 5] as const;
+const breakOptions = [60, 120] as const;
 
 export default function App() {
   const [snapshot, setSnapshot] = useState<AppSnapshot>(emptySnapshot);
@@ -108,8 +110,8 @@ export default function App() {
             />
             <StatusLine
               icon={snapshot.queueGuard.gate === "open" ? <UnlockKeyhole size={18} /> : <Lock size={18} />}
-              label="Queue gate"
-              value={gateLabel(snapshot.queueGuard.gate)}
+              label="SR gate"
+              value={gateLabel(snapshot.queueGuard)}
               tone={snapshot.queueGuard.gate === "open" ? "good" : "warn"}
             />
             <StatusLine
@@ -122,7 +124,26 @@ export default function App() {
 
           <section className="mt-6 border-t border-line pt-5">
             <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">Session</h2>
-            <div className="mt-3 grid grid-cols-3 gap-2">
+            <p className="mt-3 text-xs font-medium uppercase tracking-[0.12em] text-muted">Series length</p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {seriesOptions.map((bestOf) => (
+                <button
+                  className={`h-10 rounded-md border text-sm font-medium transition ${
+                    snapshot.settings.bestOf === bestOf
+                      ? "border-brandOrange bg-brandOrange/15 text-brandOrange"
+                      : "border-line bg-[#181c22] text-muted hover:border-[#3b4350] hover:text-ink"
+                  }`}
+                  key={bestOf}
+                  onClick={() => withSnapshot(window.tiltbreaker.updateSettings({ bestOf }))}
+                  type="button"
+                >
+                  BO{bestOf}
+                </button>
+              ))}
+            </div>
+
+            <p className="mt-4 text-xs font-medium uppercase tracking-[0.12em] text-muted">Break window</p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
               {breakOptions.map((minutes) => (
                 <button
                   className={`h-10 rounded-md border text-sm font-medium transition ${
@@ -134,7 +155,7 @@ export default function App() {
                   onClick={() => withSnapshot(window.tiltbreaker.updateSettings({ breakMinutes: minutes }))}
                   type="button"
                 >
-                  {minutes}m
+                  {minutes / 60}h
                 </button>
               ))}
             </div>
@@ -191,7 +212,7 @@ export default function App() {
                 type="button"
               >
                 <Play size={16} />
-                Start BO3
+                Start BO{snapshot.settings.bestOf}
               </button>
               <button
                 className="grid size-10 place-items-center rounded-md border border-line bg-[#181c22] text-muted hover:border-[#3b4350] hover:text-ink"
@@ -206,7 +227,11 @@ export default function App() {
 
           <div className="grid grid-cols-[minmax(0,1fr)_360px] gap-6 p-8">
             <section className="min-w-0 space-y-6">
-              <SeriesPanel breakRemaining={breakRemaining} series={snapshot.series} />
+              <SeriesPanel
+                breakRemaining={breakRemaining}
+                series={snapshot.series}
+                settingsBestOf={snapshot.settings.bestOf}
+              />
 
               <section className="rounded-lg border border-line bg-panel">
                 <div className="flex h-14 items-center justify-between border-b border-line px-5">
@@ -235,7 +260,10 @@ export default function App() {
                   )}
                 </div>
 
-                <MatchList emptyLabel="No games in this BO3 yet" matches={snapshot.series.games} />
+                <MatchList
+                  emptyLabel={`No games in this BO${snapshot.series.bestOf ?? snapshot.settings.bestOf} yet`}
+                  matches={snapshot.series.games}
+                />
               </section>
             </section>
 
@@ -271,10 +299,20 @@ export default function App() {
   );
 }
 
-function SeriesPanel({ breakRemaining, series }: { breakRemaining: number; series: SeriesState }) {
-  const activeSlotCount = Math.max(3, series.games.length);
+function SeriesPanel({
+  breakRemaining,
+  series,
+  settingsBestOf
+}: {
+  breakRemaining: number;
+  series: SeriesState;
+  settingsBestOf: SeriesBestOf;
+}) {
+  const bestOf = series.bestOf ?? settingsBestOf;
+  const activeSlotCount = Math.max(bestOf, series.games.length);
+  const slotGridClass = bestOf === 5 ? "grid-cols-5" : "grid-cols-3 max-w-[340px]";
   const statusLabel =
-    series.status === "active" ? "Active BO3" : series.status === "break" ? "Break window" : "Ready";
+    series.status === "active" ? `Active BO${bestOf}` : series.status === "break" ? "Break window" : `Ready for BO${bestOf}`;
 
   return (
     <section className="relative overflow-hidden rounded-lg border border-[#34284a] bg-panel p-5">
@@ -284,25 +322,32 @@ function SeriesPanel({ breakRemaining, series }: { breakRemaining: number; serie
         className="pointer-events-none absolute -right-12 -top-20 w-[310px] opacity-[0.08]"
         src={tiltbreakerMark}
       />
-      <div className="relative flex items-start justify-between gap-5">
-        <div>
-          <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.14em] text-brandOrange">
-            <Clock3 size={16} />
-            {statusLabel}
+      <div className="relative grid gap-5">
+        <div className="flex items-start justify-between gap-5">
+          <div>
+            <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.14em] text-brandOrange">
+              <Clock3 size={16} />
+              {statusLabel}
+            </div>
+            <p className="mt-3 text-5xl font-semibold tracking-normal">
+              {series.status === "break" ? formatDuration(breakRemaining) : `${series.wins}-${series.losses}`}
+            </p>
+            <p className="mt-2 text-sm text-muted">
+              {series.status === "break"
+                ? "Break remaining"
+                : series.status === "active"
+                  ? "Current series score"
+                  : "No active series"}
+            </p>
           </div>
-          <p className="mt-3 text-5xl font-semibold tracking-normal">
-            {series.status === "break" ? formatDuration(breakRemaining) : `${series.wins}-${series.losses}`}
-          </p>
-          <p className="mt-2 text-sm text-muted">
-            {series.status === "break"
-              ? "Break remaining"
-              : series.status === "active"
-                ? "Current series score"
-                : "No active series"}
-          </p>
+
+          <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.14em] text-brandOrange">
+            <Trophy size={16} />
+            First to {Math.ceil(bestOf / 2)}
+          </div>
         </div>
 
-        <div className="grid w-[340px] grid-cols-3 gap-2">
+        <div className={`grid w-full ${slotGridClass} gap-2`}>
           {Array.from({ length: activeSlotCount }).map((_, index) => {
             const match = series.games[index];
             const tone =
@@ -421,13 +466,17 @@ function StatusLine({
   );
 }
 
-function gateLabel(gate: AppSnapshot["queueGuard"]["gate"]) {
-  if (gate === "open") {
+function gateLabel(queueGuard: AppSnapshot["queueGuard"]) {
+  if (queueGuard.currentQueue && !queueGuard.currentQueue.isSummonersRift) {
+    return "Bypassed";
+  }
+
+  if (queueGuard.gate === "open") {
     return "Open";
   }
 
-  if (gate === "closed") {
-    return "Closed";
+  if (queueGuard.gate === "closed") {
+    return "Locked";
   }
 
   return "Unavailable";

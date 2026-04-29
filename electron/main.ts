@@ -2,8 +2,25 @@ import { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol, type OpenDi
 import { join } from "node:path";
 import { LcuClient } from "./lcuClient";
 import { parseMatches } from "./matchParser";
+import { isSummonersRiftQueue } from "./queueRules";
 import { SessionStore } from "./sessionStore";
-import type { AppSnapshot, LcuPhase, LcuStatus, QueueGuardState, SummonerInfo, TiltBreakerSettings } from "./types";
+import type {
+  AppSnapshot,
+  LcuPhase,
+  LcuStatus,
+  QueueContext,
+  QueueGuardState,
+  SummonerInfo,
+  TiltBreakerSettings
+} from "./types";
+
+interface LcuLobby {
+  gameConfig?: {
+    gameMode?: string;
+    mapId?: number;
+    queueId?: number;
+  };
+}
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -190,7 +207,8 @@ async function pollLcu() {
       }
     }
 
-    await enforceQueueGuard(phase);
+    const currentQueue = await getCurrentQueue();
+    await enforceQueueGuard(phase, currentQueue);
     pushSnapshot();
   } catch (error) {
     lcuStatus = {
@@ -200,17 +218,23 @@ async function pollLcu() {
     };
     queueGuard = {
       ...queueGuard,
+      currentQueue: undefined,
       gate: "unavailable"
     };
     pushSnapshot();
   }
 }
 
-async function enforceQueueGuard(phase?: LcuPhase) {
-  const gate = getQueueGate();
+async function enforceQueueGuard(phase?: LcuPhase, currentQueue?: QueueContext) {
+  const gate = store.settings.queueGuardEnabled
+    ? getQueueGate(currentQueue)
+    : lcuStatus.connected
+      ? "open"
+      : "unavailable";
 
   queueGuard = {
     ...queueGuard,
+    currentQueue,
     enabled: store.settings.queueGuardEnabled,
     gate
   };
@@ -219,8 +243,30 @@ async function enforceQueueGuard(phase?: LcuPhase) {
     return;
   }
 
-  if (phase === "Matchmaking" || phase === "ReadyCheck") {
-    await cancelQueue("Outside active BO3 session");
+  if ((phase === "Matchmaking" || phase === "ReadyCheck") && currentQueue?.isSummonersRift) {
+    await cancelQueue(`Summoner's Rift outside active BO${store.settings.bestOf} session`);
+  }
+}
+
+async function getCurrentQueue(): Promise<QueueContext | undefined> {
+  try {
+    const lobby = await lcu.requestJson<LcuLobby>("/lol-lobby/v2/lobby");
+    const gameConfig = lobby.gameConfig;
+
+    if (!gameConfig) {
+      return undefined;
+    }
+
+    const queueId = normalizeNumber(gameConfig.queueId);
+    const mapId = normalizeNumber(gameConfig.mapId);
+    return {
+      id: queueId,
+      isSummonersRift: isSummonersRiftQueue(queueId, mapId),
+      mapId,
+      mode: gameConfig.gameMode
+    };
+  } catch {
+    return undefined;
   }
 }
 
@@ -237,9 +283,13 @@ async function cancelQueue(reason: string) {
   };
 }
 
-function getQueueGate() {
+function getQueueGate(currentQueue?: QueueContext) {
   if (!lcuStatus.connected) {
     return "unavailable";
+  }
+
+  if (currentQueue && !currentQueue.isSummonersRift) {
+    return "open";
   }
 
   if (store.series.status !== "active") {
@@ -261,4 +311,8 @@ function snapshot(): AppSnapshot {
 
 function pushSnapshot() {
   mainWindow?.webContents.send("snapshot", snapshot());
+}
+
+function normalizeNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
