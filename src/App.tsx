@@ -115,6 +115,7 @@ export default function App() {
               className="mx-auto block w-[216px]"
               src={tiltbreakerLogo}
             />
+            <p className="pb-1 text-center text-xs font-medium text-muted">v{__APP_VERSION__}</p>
           </div>
 
           <div className="mt-5 space-y-3">

@@ -78,6 +78,7 @@ async function createWindow() {
     height: 780,
     minWidth: 1024,
     minHeight: 680,
+    autoHideMenuBar: true,
     backgroundColor: "#101216",
     icon: getIconPath("ico"),
     title: "TiltBreaker",
@@ -106,6 +107,7 @@ async function createWindow() {
 
 app.whenReady().then(async () => {
   app.setAppUserModelId("app.tiltbreaker.desktop");
+  Menu.setApplicationMenu(null);
   nativeTheme.themeSource = "dark";
   store = new SessionStore(join(app.getPath("userData"), "tiltbreaker-state.json"));
   lcu.setPreferredLockfilePath(store.settings.lockfilePath);

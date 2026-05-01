@@ -3,6 +3,8 @@
 import type { AppSnapshot, TiltBreakerSettings } from "../electron/types";
 
 declare global {
+  const __APP_VERSION__: string;
+
   interface Window {
     tiltbreaker: {
       assetUrl(path: string): string;
