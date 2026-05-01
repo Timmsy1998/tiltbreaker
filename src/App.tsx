@@ -543,36 +543,44 @@ function MatchList({
 
   return (
     <div className="divide-y divide-line">
-      {matches.map((match) => (
-        <div
-          className={`flex items-start gap-3 px-5 py-4 ${compact ? "min-h-[84px]" : "min-h-[92px]"}`}
-          key={match.gameId}
-        >
-          <img
-            alt=""
-            className="size-12 shrink-0 rounded-md border border-line bg-[#101216]"
-            src={window.tiltbreaker.assetUrl(`/lol-game-data/assets/v1/champion-icons/${match.championId}.png`)}
-          />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <p className="truncate font-semibold">{match.championName}</p>
-              <span className={`rounded px-1.5 py-0.5 text-xs font-semibold ${resultBadgeClass(match.result)}`}>
-                {resultLabel(match.result)}
-              </span>
+      {matches.map((match) => {
+        const csPerMinute = formatCsPerMinute(match);
+
+        return (
+          <div
+            className={`flex items-start gap-3 px-5 py-4 ${compact ? "min-h-[84px]" : "min-h-[92px]"}`}
+            key={match.gameId}
+          >
+            <img
+              alt=""
+              className="size-12 shrink-0 rounded-md border border-line bg-[#101216]"
+              src={window.tiltbreaker.assetUrl(`/lol-game-data/assets/v1/champion-icons/${match.championId}.png`)}
+            />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <p className="truncate font-semibold">{match.championName}</p>
+                <span className={`rounded px-1.5 py-0.5 text-xs font-semibold ${resultBadgeClass(match.result)}`}>
+                  {resultLabel(match.result)}
+                </span>
+              </div>
+              <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-sm text-muted">
+                <span>{match.kills}/{match.deaths}/{match.assists}</span>
+                <span>{formatKdaRatio(match)} KDA</span>
+                {typeof match.cs === "number" ? (
+                  <span>
+                    {match.cs} CS{csPerMinute ? ` · ${csPerMinute} CS/m` : ""}
+                  </span>
+                ) : null}
+                {match.durationSeconds ? <span>{formatDuration(match.durationSeconds * 1000)}</span> : null}
+              </div>
             </div>
-            <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-sm text-muted">
-              <span>{match.kills}/{match.deaths}/{match.assists}</span>
-              <span>{formatKdaRatio(match)} KDA</span>
-              {typeof match.cs === "number" ? <span>{match.cs} CS</span> : null}
-              {match.durationSeconds ? <span>{formatDuration(match.durationSeconds * 1000)}</span> : null}
+            <div className="shrink-0 text-right text-sm text-muted">
+              <p className="font-medium text-ink">{formatClock(match.createdAt)}</p>
+              <p className="mt-1 max-w-[112px] truncate">{match.queueName ?? queueLabel(match.queueId)}</p>
             </div>
           </div>
-          <div className="shrink-0 text-right text-sm text-muted">
-            <p className="font-medium text-ink">{formatClock(match.createdAt)}</p>
-            <p className="mt-1 max-w-[112px] truncate">{match.queueName ?? queueLabel(match.queueId)}</p>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -699,6 +707,14 @@ function formatKdaRatio(match: MatchSummary) {
       : Number(((match.kills + match.assists) / Math.max(1, match.deaths)).toFixed(2));
 
   return ratio.toFixed(2);
+}
+
+function formatCsPerMinute(match: MatchSummary) {
+  if (typeof match.cs !== "number" || !match.durationSeconds) {
+    return undefined;
+  }
+
+  return (match.cs / (match.durationSeconds / 60)).toFixed(1);
 }
 
 function formatLpDelta(delta?: number) {
