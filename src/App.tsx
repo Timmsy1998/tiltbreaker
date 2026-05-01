@@ -94,7 +94,7 @@ export default function App() {
   const summonerName =
     snapshot.lcu.summoner?.gameName && snapshot.lcu.summoner?.tagLine
       ? `${snapshot.lcu.summoner.gameName}#${snapshot.lcu.summoner.tagLine}`
-      : snapshot.lcu.summoner?.displayName ?? "League Client";
+      : snapshot.lcu.summoner?.displayName || snapshot.lcu.summoner?.gameName || "League Client";
   const selectedSession = snapshot.completedSessions.find((session) => session.id === selectedSessionId);
 
   async function withSnapshot(action: Promise<AppSnapshot>) {
@@ -552,11 +552,7 @@ function MatchList({
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <p className="truncate font-semibold">{match.championName}</p>
-              <span
-                className={`rounded px-1.5 py-0.5 text-xs font-semibold ${
-                  match.result === "win" ? "bg-good/15 text-good" : "bg-bad/15 text-bad"
-                }`}
-              >
+              <span className={`rounded px-1.5 py-0.5 text-xs font-semibold ${resultBadgeClass(match.result)}`}>
                 {resultLabel(match.result)}
               </span>
             </div>
@@ -650,6 +646,18 @@ function resultLabel(result: MatchSummary["result"]) {
   }
 
   return "Game";
+}
+
+function resultBadgeClass(result: MatchSummary["result"]) {
+  if (result === "win") {
+    return "bg-good/15 text-good";
+  }
+
+  if (result === "loss") {
+    return "bg-bad/15 text-bad";
+  }
+
+  return "bg-[#252a32] text-muted";
 }
 
 function sessionResultLabel(result: CompletedSession["result"]) {

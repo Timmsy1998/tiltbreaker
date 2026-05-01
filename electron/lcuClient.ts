@@ -26,6 +26,10 @@ export class LcuClient {
   private preferredLockfilePath?: string;
 
   setPreferredLockfilePath(lockfilePath?: string) {
+    if (this.preferredLockfilePath === lockfilePath) {
+      return;
+    }
+
     this.preferredLockfilePath = lockfilePath;
     this.connection = undefined;
   }
@@ -118,9 +122,13 @@ export class LcuClient {
             }
 
             if (options.responseType === "buffer") {
+              const contentType = res.headers["content-type"];
+
               resolve({
                 buffer,
-                contentType: res.headers["content-type"] ?? "application/octet-stream"
+                contentType: Array.isArray(contentType)
+                  ? contentType[0]
+                  : contentType ?? "application/octet-stream"
               });
               return;
             }

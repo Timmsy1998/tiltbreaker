@@ -186,7 +186,8 @@ function parseResult(value: boolean | string | number | undefined): MatchSummary
     normalized === "win" ||
     normalized === "won" ||
     normalized === "victory" ||
-    normalized === "true"
+    normalized === "true" ||
+    normalized === "1"
   ) {
     return "win";
   }
@@ -196,7 +197,8 @@ function parseResult(value: boolean | string | number | undefined): MatchSummary
     normalized === "loss" ||
     normalized === "lost" ||
     normalized === "defeat" ||
-    normalized === "false"
+    normalized === "false" ||
+    normalized === "0"
   ) {
     return "loss";
   }
