@@ -383,6 +383,8 @@ async function cancelQueue(reason: string) {
 }
 
 function getQueueGate(currentQueue?: QueueContext) {
+  store.normalizeBreak();
+
   if (!lcuStatus.connected) {
     return "unavailable";
   }

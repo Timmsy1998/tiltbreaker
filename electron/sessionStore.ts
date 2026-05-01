@@ -69,12 +69,12 @@ export class SessionStore {
     return this.state.lpDay;
   }
 
-  normalizeBreak() {
-    if (this.state.series.status !== "break" || !this.state.series.breakUntil) {
+  normalizeBreak(now = Date.now()) {
+    if (this.state.series.status !== "break") {
       return;
     }
 
-    if (this.state.series.breakUntil > Date.now()) {
+    if (typeof this.state.series.breakUntil === "number" && this.state.series.breakUntil > now) {
       return;
     }
 
@@ -104,17 +104,25 @@ export class SessionStore {
   }
 
   startSeries() {
+    const now = Date.now();
+    this.normalizeBreak(now);
+
+    if (this.state.series.status !== "idle") {
+      return false;
+    }
+
     this.state.series = {
       bestOf: this.state.settings.bestOf,
       endedAt: undefined,
       games: [],
       losses: 0,
       lpStart: this.state.ranked,
-      startedAt: Date.now(),
+      startedAt: now,
       status: "active",
       wins: 0
     };
     this.save();
+    return true;
   }
 
   endSeries() {
@@ -122,6 +130,13 @@ export class SessionStore {
   }
 
   clearBreak() {
+    const now = Date.now();
+    this.normalizeBreak(now);
+
+    if (this.state.series.status !== "idle") {
+      return false;
+    }
+
     this.state.series = {
       endedAt: undefined,
       games: [],
@@ -130,6 +145,7 @@ export class SessionStore {
       wins: 0
     };
     this.save();
+    return true;
   }
 
   updateSettings(settings: Partial<TiltBreakerSettings>) {
@@ -259,8 +275,9 @@ export class SessionStore {
       return;
     }
 
-    const startedAt = this.state.series.startedAt ?? Date.now();
-    const endedAt = Date.now();
+    const now = Date.now();
+    const startedAt = this.state.series.startedAt ?? now;
+    const endedAt = getLatestGameEndedAt(games) ?? now;
     const breakUntil = endedAt + this.state.settings.breakMinutes * 60 * 1000;
     const bestOf = this.state.series.bestOf ?? this.state.settings.bestOf;
     const wins = games.filter((match) => match.result === "win").length;
@@ -516,6 +533,23 @@ function getSessionResult(bestOf: number, wins: number, losses: number): Complet
   }
 
   return "incomplete";
+}
+
+function getLatestGameEndedAt(games: MatchSummary[]) {
+  const latestEndedAt = games.reduce((latest, game) => {
+    if (!game.createdAt) {
+      return latest;
+    }
+
+    const durationMs =
+      typeof game.durationSeconds === "number" && Number.isFinite(game.durationSeconds)
+        ? game.durationSeconds * 1000
+        : 0;
+
+    return Math.max(latest, game.createdAt + durationMs);
+  }, 0);
+
+  return latestEndedAt || undefined;
 }
 
 function getDateKey() {

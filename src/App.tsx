@@ -96,6 +96,8 @@ export default function App() {
       ? `${snapshot.lcu.summoner.gameName}#${snapshot.lcu.summoner.tagLine}`
       : snapshot.lcu.summoner?.displayName || snapshot.lcu.summoner?.gameName || "League Client";
   const selectedSession = snapshot.completedSessions.find((session) => session.id === selectedSessionId);
+  const isBreakActive = snapshot.series.status === "break" && breakRemaining > 0;
+  const canStartSeries = snapshot.series.status !== "active" && !isBreakActive;
 
   async function withSnapshot(action: Promise<AppSnapshot>) {
     setSnapshot(await action);
@@ -220,12 +222,12 @@ export default function App() {
             <div className="flex items-center gap-2">
               <button
                 className="flex h-10 items-center gap-2 rounded-md border border-brandOrange/50 bg-brandOrange/15 px-4 text-sm font-semibold text-brandOrange hover:border-brandOrange disabled:cursor-not-allowed disabled:border-line disabled:bg-[#181c22] disabled:text-muted"
-                disabled={snapshot.series.status === "active"}
+                disabled={!canStartSeries}
                 onClick={() => withSnapshot(window.tiltbreaker.startSeries())}
                 type="button"
               >
                 <Play size={16} />
-                Start BO{snapshot.settings.bestOf}
+                {isBreakActive ? `Break ${formatDuration(breakRemaining)}` : `Start BO${snapshot.settings.bestOf}`}
               </button>
               <button
                 className="grid size-10 place-items-center rounded-md border border-line bg-[#181c22] text-muted hover:border-[#3b4350] hover:text-ink"
@@ -263,8 +265,10 @@ export default function App() {
                     </button>
                   ) : (
                     <button
-                      className="flex h-9 items-center gap-2 rounded-md border border-line bg-[#1b2027] px-3 text-sm text-muted hover:text-ink"
+                      className="flex h-9 items-center gap-2 rounded-md border border-line bg-[#1b2027] px-3 text-sm text-muted hover:text-ink disabled:cursor-not-allowed disabled:text-muted/60"
+                      disabled={isBreakActive}
                       onClick={() => withSnapshot(window.tiltbreaker.clearBreak())}
+                      title={isBreakActive ? "Break timer is still running" : "Reset series"}
                       type="button"
                     >
                       <RotateCcw size={15} />
