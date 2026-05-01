@@ -70,11 +70,18 @@ export class SessionStore {
   }
 
   normalizeBreak(now = Date.now()) {
-    if (this.state.series.status !== "break") {
+    const completedBreak = getActiveCompletedSessionBreak(this.state.completedSessions, now);
+
+    if (completedBreak && shouldRestoreCompletedBreak(this.state.series, completedBreak)) {
+      this.state.series = getSeriesFromCompletedBreak(completedBreak);
+      this.save();
       return;
     }
 
-    if (typeof this.state.series.breakUntil === "number" && this.state.series.breakUntil > now) {
+    if (
+      this.state.series.status !== "break" ||
+      (typeof this.state.series.breakUntil === "number" && this.state.series.breakUntil > now)
+    ) {
       return;
     }
 
@@ -550,6 +557,38 @@ function getLatestGameEndedAt(games: MatchSummary[]) {
   }, 0);
 
   return latestEndedAt || undefined;
+}
+
+function getActiveCompletedSessionBreak(sessions: CompletedSession[], now: number) {
+  return sessions
+    .filter((session) => typeof session.breakUntil === "number" && session.breakUntil > now)
+    .sort((a, b) => b.endedAt - a.endedAt)[0];
+}
+
+function shouldRestoreCompletedBreak(series: SeriesState, session: CompletedSession) {
+  return (
+    series.status !== "break" ||
+    series.breakUntil !== session.breakUntil ||
+    series.startedAt !== session.startedAt ||
+    series.endedAt !== session.endedAt ||
+    series.games.length !== session.games.length
+  );
+}
+
+function getSeriesFromCompletedBreak(session: CompletedSession): SeriesState {
+  return {
+    bestOf: session.bestOf,
+    breakUntil: session.breakUntil,
+    endedAt: session.endedAt,
+    games: session.games,
+    losses: session.losses,
+    lpCurrent: session.lpEnd,
+    lpDelta: session.lpDelta,
+    lpStart: session.lpStart,
+    startedAt: session.startedAt,
+    status: "break",
+    wins: session.wins
+  };
 }
 
 function getDateKey() {
