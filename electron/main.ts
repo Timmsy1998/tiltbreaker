@@ -54,8 +54,13 @@ protocol.registerSchemesAsPrivileged([
 
 const lcu = new LcuClient();
 const POLL_INTERVAL_MS = 2000;
-const POST_GAME_REFRESH_MS = 90 * 1000;
-const POST_GAME_PHASES = new Set(["WaitingForStats", "PreEndOfGame", "EndOfGame"]);
+const MATCH_HISTORY_QUERY = "begIndex=0&endIndex=20";
+const MATCH_HISTORY_OPTIONS = {
+  headers: {
+    "Cache-Control": "no-cache",
+    Pragma: "no-cache"
+  }
+};
 let store: SessionStore;
 let mainWindow: BrowserWindow | undefined;
 let tray: Tray | undefined;
@@ -65,9 +70,7 @@ let pollTimer: NodeJS.Timeout | undefined;
 let isQuitting = false;
 let championNames = new Map<number, string>();
 let championNamesLoadedAt = 0;
-let lastPhase: LcuPhase | undefined;
 let polling = false;
-let postGameRefreshUntil = 0;
 
 async function createWindow() {
   mainWindow = new BrowserWindow({
@@ -280,7 +283,6 @@ async function pollLcu() {
     const phase = phaseResult.status === "fulfilled" ? phaseResult.value : undefined;
     const ranked =
       rankedResult.status === "fulfilled" ? parseRankedSnapshot(rankedResult.value) : undefined;
-    trackPostGameRefresh(phase);
 
     lcuStatus = {
       connected: true,
@@ -294,14 +296,7 @@ async function pollLcu() {
     if (summoner) {
       try {
         const names = await getChampionNames();
-        const matchHistoryOptions =
-          postGameRefreshUntil > Date.now()
-            ? { headers: { "Cache-Control": "no-cache", Pragma: "no-cache" } }
-            : undefined;
-        const matchHistory = await lcu.requestJson<unknown>(
-          "/lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex=20",
-          matchHistoryOptions
-        );
+        const matchHistory = await getMatchHistory(summoner);
         store.mergeMatches(parseMatches(matchHistory, summoner, names));
       } catch {
         store.mergeMatches([]);
@@ -421,17 +416,6 @@ function normalizeNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
-function trackPostGameRefresh(phase?: LcuPhase) {
-  const enteredPostGame = Boolean(phase && POST_GAME_PHASES.has(phase) && phase !== lastPhase);
-  const leftGame = lastPhase === "InProgress" && phase !== "InProgress";
-
-  if (enteredPostGame || leftGame) {
-    postGameRefreshUntil = Date.now() + POST_GAME_REFRESH_MS;
-  }
-
-  lastPhase = phase;
-}
-
 async function getChampionNames() {
   const staleAfterMs = 60 * 60 * 1000;
 
@@ -459,4 +443,24 @@ async function getChampionNames() {
   }
 
   return championNames;
+}
+
+async function getMatchHistory(summoner: SummonerInfo) {
+  const endpoints = [
+    `/lol-match-history/v1/products/lol/current-summoner/matches?${MATCH_HISTORY_QUERY}`,
+    ...(summoner.puuid
+      ? [`/lol-match-history/v1/products/lol/${encodeURIComponent(summoner.puuid)}/matches?${MATCH_HISTORY_QUERY}`]
+      : [])
+  ];
+  let lastError: unknown;
+
+  for (const endpoint of endpoints) {
+    try {
+      return await lcu.requestJson<unknown>(endpoint, MATCH_HISTORY_OPTIONS);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError ?? new Error("Unable to load match history.");
 }
