@@ -561,7 +561,10 @@ function getLatestGameEndedAt(games: MatchSummary[]) {
 
 function getActiveCompletedSessionBreak(sessions: CompletedSession[], now: number) {
   return sessions
-    .filter((session) => typeof session.breakUntil === "number" && session.breakUntil > now)
+    .filter(
+      (session) =>
+        session.result !== "incomplete" && typeof session.breakUntil === "number" && session.breakUntil > now
+    )
     .sort((a, b) => b.endedAt - a.endedAt)[0];
 }
 

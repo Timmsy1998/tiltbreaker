@@ -95,7 +95,8 @@ export default function App() {
     snapshot.lcu.summoner?.gameName && snapshot.lcu.summoner?.tagLine
       ? `${snapshot.lcu.summoner.gameName}#${snapshot.lcu.summoner.tagLine}`
       : snapshot.lcu.summoner?.displayName || snapshot.lcu.summoner?.gameName || "League Client";
-  const selectedSession = snapshot.completedSessions.find((session) => session.id === selectedSessionId);
+  const completedHistorySessions = snapshot.completedSessions.filter(isCompleteSession);
+  const selectedSession = completedHistorySessions.find((session) => session.id === selectedSessionId);
   const isBreakActive = snapshot.series.status === "break" && breakRemaining > 0;
   const canStartSeries = snapshot.series.status !== "active" && !isBreakActive;
 
@@ -291,7 +292,7 @@ export default function App() {
 
               <SessionHistory
                 selectedSessionId={selectedSessionId}
-                sessions={snapshot.completedSessions}
+                sessions={completedHistorySessions}
                 onSelect={setSelectedSessionId}
               />
 
@@ -507,6 +508,10 @@ function SessionDetail({ session }: { session: CompletedSession }) {
       <MatchList emptyLabel="No games recorded for this session" matches={session.games} />
     </section>
   );
+}
+
+function isCompleteSession(session: CompletedSession) {
+  return session.result !== "incomplete";
 }
 
 function StatTile({
