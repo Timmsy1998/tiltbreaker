@@ -540,10 +540,13 @@ function MatchList({
   return (
     <div className="divide-y divide-line">
       {matches.map((match) => (
-        <div className={`flex items-center gap-3 px-5 ${compact ? "h-[76px]" : "h-[86px]"}`} key={match.gameId}>
+        <div
+          className={`flex items-start gap-3 px-5 py-4 ${compact ? "min-h-[84px]" : "min-h-[92px]"}`}
+          key={match.gameId}
+        >
           <img
             alt=""
-            className="size-12 rounded-md border border-line bg-[#101216]"
+            className="size-12 shrink-0 rounded-md border border-line bg-[#101216]"
             src={window.tiltbreaker.assetUrl(`/lol-game-data/assets/v1/champion-icons/${match.championId}.png`)}
           />
           <div className="min-w-0 flex-1">
@@ -557,14 +560,14 @@ function MatchList({
                 {resultLabel(match.result)}
               </span>
             </div>
-            <p className="mt-1 truncate text-sm text-muted">
-              {match.kills}/{match.deaths}/{match.assists}
-              {` · ${formatKdaRatio(match)} KDA`}
-              {typeof match.cs === "number" ? ` · ${match.cs} CS` : ""}
-              {match.durationSeconds ? ` · ${formatDuration(match.durationSeconds * 1000)}` : ""}
-            </p>
+            <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-sm text-muted">
+              <span>{match.kills}/{match.deaths}/{match.assists}</span>
+              <span>{formatKdaRatio(match)} KDA</span>
+              {typeof match.cs === "number" ? <span>{match.cs} CS</span> : null}
+              {match.durationSeconds ? <span>{formatDuration(match.durationSeconds * 1000)}</span> : null}
+            </div>
           </div>
-          <div className="text-right text-sm text-muted">
+          <div className="shrink-0 text-right text-sm text-muted">
             <p className="font-medium text-ink">{formatClock(match.createdAt)}</p>
             <p className="mt-1 max-w-[112px] truncate">{match.queueName ?? queueLabel(match.queueId)}</p>
           </div>
