@@ -13,7 +13,7 @@ npm run build
 npm run dist
 ```
 
-`npm run dist` creates a Windows installer at `release/TiltBreaker Setup 1.2.0.exe` and an unpacked executable at `release/win-unpacked/TiltBreaker.exe`.
+`npm run dist` creates a Windows installer at `release/TiltBreaker Setup 1.5.0.exe` and an unpacked executable at `release/win-unpacked/TiltBreaker.exe`.
 
 ## LCU integration
 
