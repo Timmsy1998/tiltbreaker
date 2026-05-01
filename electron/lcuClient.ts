@@ -16,6 +16,7 @@ interface LockfileConnection {
 interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
+  headers?: Record<string, string>;
 }
 
 const execFileAsync = promisify(execFile);
@@ -100,7 +101,8 @@ export class LcuClient {
           headers: {
             Authorization: `Basic ${auth}`,
             Accept: "*/*",
-            ...(body ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) } : {})
+            ...(body ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) } : {}),
+            ...options.headers
           }
         },
         (res) => {

@@ -294,10 +294,13 @@ async function pollLcu() {
     if (summoner) {
       try {
         const names = await getChampionNames();
-        const matchHistoryCacheKey =
-          postGameRefreshUntil > Date.now() ? Date.now() : Math.floor(Date.now() / 10_000);
+        const matchHistoryOptions =
+          postGameRefreshUntil > Date.now()
+            ? { headers: { "Cache-Control": "no-cache", Pragma: "no-cache" } }
+            : undefined;
         const matchHistory = await lcu.requestJson<unknown>(
-          `/lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex=20&_=${matchHistoryCacheKey}`
+          "/lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex=20",
+          matchHistoryOptions
         );
         store.mergeMatches(parseMatches(matchHistory, summoner, names));
       } catch {
