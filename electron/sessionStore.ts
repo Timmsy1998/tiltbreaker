@@ -20,6 +20,8 @@ interface PersistedState {
   settings: TiltBreakerSettings;
 }
 
+const SESSION_MATCH_START_GRACE_MS = 15 * 60 * 1000;
+
 const defaultState: PersistedState = {
   completedSessions: [],
   recentMatches: [],
@@ -104,6 +106,7 @@ export class SessionStore {
   startSeries() {
     this.state.series = {
       bestOf: this.state.settings.bestOf,
+      endedAt: undefined,
       games: [],
       losses: 0,
       lpStart: this.state.ranked,
@@ -120,6 +123,7 @@ export class SessionStore {
 
   clearBreak() {
     this.state.series = {
+      endedAt: undefined,
       games: [],
       losses: 0,
       status: "idle",
@@ -180,10 +184,11 @@ export class SessionStore {
 
     const bestOf = this.state.series.bestOf ?? this.state.settings.bestOf;
     const targetWins = Math.ceil(bestOf / 2);
+    const startedAt = this.state.series.startedAt ?? 0;
     const seriesMatches = uniqueMatches(
       matches
         .filter(
-          (match) => match.createdAt >= (this.state.series.startedAt ?? 0) && isSummonersRiftQueue(match.queueId)
+          (match) => match.createdAt >= startedAt - SESSION_MATCH_START_GRACE_MS && isSummonersRiftQueue(match.queueId)
         )
         .concat(this.state.series.games.filter((match) => isSummonersRiftQueue(match.queueId)))
     )
@@ -192,6 +197,7 @@ export class SessionStore {
 
     const wins = seriesMatches.filter((match) => match.result === "win").length;
     const losses = seriesMatches.filter((match) => match.result === "loss").length;
+    const decidedGames = wins + losses;
 
     this.state.series = {
       ...this.state.series,
@@ -202,7 +208,7 @@ export class SessionStore {
       losses
     };
 
-    if (wins >= targetWins || losses >= targetWins || seriesMatches.length >= bestOf) {
+    if (wins >= targetWins || losses >= targetWins || decidedGames >= bestOf) {
       this.finishActiveSeries(seriesMatches);
       return;
     }
@@ -276,6 +282,7 @@ export class SessionStore {
     this.state.series = {
       ...this.state.series,
       breakUntil,
+      endedAt,
       games,
       losses,
       lpCurrent: lpEnd,

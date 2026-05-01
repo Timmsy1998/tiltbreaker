@@ -336,6 +336,7 @@ function SeriesPanel({
   const slotGridClass = bestOf === 5 ? "grid-cols-5" : "grid-cols-3 max-w-[340px]";
   const statusLabel =
     series.status === "active" ? `Active BO${bestOf}` : series.status === "break" ? "Break window" : `Ready for BO${bestOf}`;
+  const detailLabel = getSeriesDetailLabel(series);
 
   return (
     <section className="relative overflow-hidden rounded-lg border border-[#34284a] bg-panel p-5">
@@ -355,13 +356,7 @@ function SeriesPanel({
             <p className="mt-3 text-5xl font-semibold tracking-normal">
               {series.status === "break" ? formatDuration(breakRemaining) : `${series.wins}-${series.losses}`}
             </p>
-            <p className="mt-2 text-sm text-muted">
-              {series.status === "break"
-                ? "Break remaining"
-                : series.status === "active"
-                  ? "Current series score"
-                  : "No active series"}
-            </p>
+            <p className="mt-2 text-sm text-muted">{detailLabel}</p>
           </div>
 
           <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.14em] text-brandOrange">
@@ -397,6 +392,19 @@ function SeriesPanel({
       </div>
     </section>
   );
+}
+
+function getSeriesDetailLabel(series: SeriesState) {
+  if (series.status === "break" && series.breakUntil) {
+    const endedLabel = series.endedAt ? `Ended ${formatDateTime(series.endedAt)} · ` : "";
+    return `${endedLabel}Unlocks ${formatDateTime(series.breakUntil)}`;
+  }
+
+  if (series.status === "active") {
+    return "Current series score";
+  }
+
+  return "No active series";
 }
 
 function LpSummary({
@@ -550,7 +558,8 @@ function MatchList({
               </span>
             </div>
             <p className="mt-1 truncate text-sm text-muted">
-              {match.kills}/{match.deaths}/{match.assists} KDA
+              {match.kills}/{match.deaths}/{match.assists}
+              {` · ${formatKdaRatio(match)} KDA`}
               {typeof match.cs === "number" ? ` · ${match.cs} CS` : ""}
               {match.durationSeconds ? ` · ${formatDuration(match.durationSeconds * 1000)}` : ""}
             </p>
@@ -666,6 +675,15 @@ function resultClass(result: CompletedSession["result"]) {
 
 function queueLabel(queueId?: number) {
   return getQueueName(queueId) ?? "Queue -";
+}
+
+function formatKdaRatio(match: MatchSummary) {
+  const ratio =
+    typeof match.kdaRatio === "number"
+      ? match.kdaRatio
+      : Number(((match.kills + match.assists) / Math.max(1, match.deaths)).toFixed(2));
+
+  return ratio.toFixed(2);
 }
 
 function formatLpDelta(delta?: number) {

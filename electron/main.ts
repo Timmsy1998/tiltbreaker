@@ -53,6 +53,9 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 const lcu = new LcuClient();
+const POLL_INTERVAL_MS = 2000;
+const POST_GAME_REFRESH_MS = 90 * 1000;
+const POST_GAME_PHASES = new Set(["WaitingForStats", "PreEndOfGame", "EndOfGame"]);
 let store: SessionStore;
 let mainWindow: BrowserWindow | undefined;
 let tray: Tray | undefined;
@@ -62,6 +65,9 @@ let pollTimer: NodeJS.Timeout | undefined;
 let isQuitting = false;
 let championNames = new Map<number, string>();
 let championNamesLoadedAt = 0;
+let lastPhase: LcuPhase | undefined;
+let polling = false;
+let postGameRefreshUntil = 0;
 
 async function createWindow() {
   mainWindow = new BrowserWindow({
@@ -247,10 +253,16 @@ function startPolling() {
   void pollLcu();
   pollTimer = setInterval(() => {
     void pollLcu();
-  }, 2000);
+  }, POLL_INTERVAL_MS);
 }
 
 async function pollLcu() {
+  if (polling) {
+    return;
+  }
+
+  polling = true;
+
   try {
     lcu.setPreferredLockfilePath(store.settings.lockfilePath);
 
@@ -268,6 +280,7 @@ async function pollLcu() {
     const phase = phaseResult.status === "fulfilled" ? phaseResult.value : undefined;
     const ranked =
       rankedResult.status === "fulfilled" ? parseRankedSnapshot(rankedResult.value) : undefined;
+    trackPostGameRefresh(phase);
 
     lcuStatus = {
       connected: true,
@@ -281,8 +294,10 @@ async function pollLcu() {
     if (summoner) {
       try {
         const names = await getChampionNames();
+        const matchHistoryCacheKey =
+          postGameRefreshUntil > Date.now() ? Date.now() : Math.floor(Date.now() / 10_000);
         const matchHistory = await lcu.requestJson<unknown>(
-          "/lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex=12"
+          `/lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex=20&_=${matchHistoryCacheKey}`
         );
         store.mergeMatches(parseMatches(matchHistory, summoner, names));
       } catch {
@@ -305,6 +320,8 @@ async function pollLcu() {
       gate: "unavailable"
     };
     pushSnapshot();
+  } finally {
+    polling = false;
   }
 }
 
@@ -399,6 +416,17 @@ function pushSnapshot() {
 
 function normalizeNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function trackPostGameRefresh(phase?: LcuPhase) {
+  const enteredPostGame = Boolean(phase && POST_GAME_PHASES.has(phase) && phase !== lastPhase);
+  const leftGame = lastPhase === "InProgress" && phase !== "InProgress";
+
+  if (enteredPostGame || leftGame) {
+    postGameRefreshUntil = Date.now() + POST_GAME_REFRESH_MS;
+  }
+
+  lastPhase = phase;
 }
 
 async function getChampionNames() {

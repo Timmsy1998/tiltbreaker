@@ -45,6 +45,7 @@ export interface MatchSummary {
   deaths: number;
   durationSeconds: number;
   gameId: number;
+  kdaRatio: number;
   kills: number;
   queueId?: number;
   queueName?: string;
@@ -78,6 +79,7 @@ export interface LpDayState {
 export interface SeriesState {
   bestOf?: SeriesBestOf;
   breakUntil?: number;
+  endedAt?: number;
   games: MatchSummary[];
   losses: number;
   lpCurrent?: RankedSnapshot;
