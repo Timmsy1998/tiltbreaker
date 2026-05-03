@@ -1,6 +1,6 @@
 {
   "name": "tiltbreaker",
-  "version": "1.5.2",
+  "version": "2.0.0",
   "description": "Queue smart. Not tilted.",
   "license": "MIT",
   "main": "dist-electron/main.js",
