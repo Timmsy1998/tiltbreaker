@@ -49,7 +49,7 @@ export interface MatchSummary {
   kills: number;
   queueId?: number;
   queueName?: string;
-  result: "win" | "loss" | "unknown";
+  result: "win" | "loss" | "remake" | "unknown";
   cs?: number;
   gold?: number;
 }

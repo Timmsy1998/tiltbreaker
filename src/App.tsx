@@ -338,7 +338,8 @@ function SeriesPanel({
   settingsBestOf: SeriesBestOf;
 }) {
   const bestOf = series.bestOf ?? settingsBestOf;
-  const activeSlotCount = Math.max(bestOf, series.games.length);
+  const countedGames = getCountedSeriesGames(series.games);
+  const activeSlotCount = Math.max(bestOf, countedGames.length);
   const slotGridClass = bestOf === 5 ? "grid-cols-5" : "grid-cols-3 max-w-[340px]";
   const statusLabel =
     series.status === "active" ? `Active BO${bestOf}` : series.status === "break" ? "Break window" : `Ready for BO${bestOf}`;
@@ -374,12 +375,12 @@ function SeriesPanel({
         <div className="grid grid-cols-3 gap-2">
           <StatTile label="Series LP" value={formatLpDelta(series.lpDelta)} tone={getDeltaTone(series.lpDelta)} />
           <StatTile label="Best of" value={`BO${bestOf}`} />
-          <StatTile label="Games" value={`${series.games.length}/${bestOf}`} />
+          <StatTile label="Games" value={`${countedGames.length}/${bestOf}`} />
         </div>
 
         <div className={`grid w-full ${slotGridClass} gap-2`}>
           {Array.from({ length: activeSlotCount }).map((_, index) => {
-            const match = series.games[index];
+            const match = countedGames[index];
             const tone =
               match?.result === "win"
                 ? "border-good bg-good/15 text-good"
@@ -663,6 +664,10 @@ function resultLabel(result: MatchSummary["result"]) {
     return "Loss";
   }
 
+  if (result === "remake") {
+    return "Remake";
+  }
+
   return "Game";
 }
 
@@ -675,7 +680,15 @@ function resultBadgeClass(result: MatchSummary["result"]) {
     return "bg-bad/15 text-bad";
   }
 
+  if (result === "remake") {
+    return "bg-warn/15 text-warn";
+  }
+
   return "bg-[#252a32] text-muted";
+}
+
+function getCountedSeriesGames(matches: MatchSummary[]) {
+  return matches.filter((match) => match.result === "win" || match.result === "loss");
 }
 
 function sessionResultLabel(result: CompletedSession["result"]) {

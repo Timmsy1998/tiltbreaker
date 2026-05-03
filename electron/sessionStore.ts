@@ -21,6 +21,7 @@ interface PersistedState {
 }
 
 const SESSION_MATCH_START_GRACE_MS = 15 * 60 * 1000;
+const REMAKE_MAX_DURATION_SECONDS = 5 * 60;
 
 const defaultState: PersistedState = {
   completedSessions: [],
@@ -210,21 +211,22 @@ export class SessionStore {
     const bestOf = this.state.series.bestOf ?? this.state.settings.bestOf;
     const targetWins = Math.ceil(bestOf / 2);
     const startedAt = this.state.series.startedAt ?? 0;
-    const seriesMatches = uniqueMatches(
-      this.state.series.games
-        .filter((match) => isSummonersRiftQueue(match.queueId))
-        .concat(
-          incomingMatches.filter(
-            (match) =>
-              match.createdAt >= startedAt - SESSION_MATCH_START_GRACE_MS && isSummonersRiftQueue(match.queueId)
+    const seriesMatches = getSeriesMatches(
+      uniqueMatches(
+        this.state.series.games
+          .filter((match) => isSummonersRiftQueue(match.queueId))
+          .concat(
+            incomingMatches.filter(
+              (match) =>
+                match.createdAt >= startedAt - SESSION_MATCH_START_GRACE_MS && isSummonersRiftQueue(match.queueId)
+            )
           )
-        )
-    )
-      .sort((a, b) => a.createdAt - b.createdAt)
-      .slice(0, bestOf);
+      ),
+      bestOf
+    );
 
-    const wins = seriesMatches.filter((match) => match.result === "win").length;
-    const losses = seriesMatches.filter((match) => match.result === "loss").length;
+    const wins = countWins(seriesMatches);
+    const losses = countLosses(seriesMatches);
     const decidedGames = wins + losses;
 
     this.state.series = {
@@ -287,8 +289,8 @@ export class SessionStore {
     const endedAt = getLatestGameEndedAt(games) ?? now;
     const breakUntil = endedAt + this.state.settings.breakMinutes * 60 * 1000;
     const bestOf = this.state.series.bestOf ?? this.state.settings.bestOf;
-    const wins = games.filter((match) => match.result === "win").length;
-    const losses = games.filter((match) => match.result === "loss").length;
+    const wins = countWins(games);
+    const losses = countLosses(games);
     const lpEnd = this.state.ranked;
     const lpDelta = getLpDelta(this.state.series.lpStart, lpEnd);
 
@@ -335,8 +337,8 @@ export class SessionStore {
 
     if (this.state.series.games.length) {
       const games = updateStoredGames(this.state.series.games, incomingById);
-      const wins = games.filter((match) => match.result === "win").length;
-      const losses = games.filter((match) => match.result === "loss").length;
+      const wins = countWins(games);
+      const losses = countLosses(games);
 
       this.state.series = {
         ...this.state.series,
@@ -353,8 +355,8 @@ export class SessionStore {
         return session;
       }
 
-      const wins = games.filter((match) => match.result === "win").length;
-      const losses = games.filter((match) => match.result === "loss").length;
+      const wins = countWins(games);
+      const losses = countLosses(games);
 
       return {
         ...session,
@@ -384,6 +386,31 @@ function uniqueMatches(matches: MatchSummary[]) {
   }
 
   return unique.sort((a, b) => b.createdAt - a.createdAt);
+}
+
+function getSeriesMatches(matches: MatchSummary[], bestOf: number) {
+  const targetWins = Math.ceil(bestOf / 2);
+  const seriesMatches: MatchSummary[] = [];
+  let wins = 0;
+  let losses = 0;
+
+  for (const match of matches.sort((a, b) => a.createdAt - b.createdAt)) {
+    seriesMatches.push(match);
+
+    if (match.result === "win") {
+      wins += 1;
+    }
+
+    if (match.result === "loss") {
+      losses += 1;
+    }
+
+    if (wins >= targetWins || losses >= targetWins || wins + losses >= bestOf) {
+      break;
+    }
+  }
+
+  return seriesMatches;
 }
 
 function updateStoredGames(games: MatchSummary[], incomingById: Map<number, MatchSummary>) {
@@ -455,8 +482,8 @@ function mergeMatchStats(stored: MatchSummary, incoming: MatchSummary): MatchSum
 function hydrateCompletedSessions(sessions: CompletedSession[]) {
   return sessions.map((session) => {
     const games = hydrateMatches(session.games ?? []);
-    const wins = games.filter((match) => match.result === "win").length;
-    const losses = games.filter((match) => match.result === "loss").length;
+    const wins = countWins(games);
+    const losses = countLosses(games);
 
     return {
       ...session,
@@ -474,8 +501,8 @@ function hydrateSeries(series: SeriesState): SeriesState {
   return {
     ...series,
     games,
-    losses: games.filter((match) => match.result === "loss").length,
-    wins: games.filter((match) => match.result === "win").length
+    losses: countLosses(games),
+    wins: countWins(games)
   };
 }
 
@@ -487,17 +514,44 @@ function hydrateMatch(match: MatchSummary): MatchSummary {
   const kills = normalizeStat(match.kills);
   const deaths = normalizeStat(match.deaths);
   const assists = normalizeStat(match.assists);
+  const durationSeconds = normalizeStat(match.durationSeconds);
 
   return {
     ...match,
     assists,
     cs: normalizeOptionalStat(match.cs),
     deaths,
-    durationSeconds: normalizeStat(match.durationSeconds),
+    durationSeconds,
     gold: normalizeOptionalStat(match.gold),
     kdaRatio: typeof match.kdaRatio === "number" ? match.kdaRatio : getKdaRatio(kills, deaths, assists),
-    kills
+    kills,
+    result: getHydratedResult(match.result, durationSeconds)
   };
+}
+
+function getHydratedResult(result: unknown, durationSeconds: number): MatchSummary["result"] {
+  if (isRemakeDuration(durationSeconds)) {
+    return "remake";
+  }
+
+  return result === "win" || result === "loss" || result === "remake" || result === "unknown" ? result : "unknown";
+}
+
+function isRemakeDuration(durationSeconds: unknown) {
+  return (
+    typeof durationSeconds === "number" &&
+    Number.isFinite(durationSeconds) &&
+    durationSeconds > 0 &&
+    durationSeconds < REMAKE_MAX_DURATION_SECONDS
+  );
+}
+
+function countWins(games: MatchSummary[]) {
+  return games.filter((match) => match.result === "win").length;
+}
+
+function countLosses(games: MatchSummary[]) {
+  return games.filter((match) => match.result === "loss").length;
 }
 
 function hasNonZeroStats(match: MatchSummary) {

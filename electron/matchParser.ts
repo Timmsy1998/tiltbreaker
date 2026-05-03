@@ -1,6 +1,8 @@
 import { getQueueName } from "./queueRules";
 import type { MatchSummary, SummonerInfo } from "./types";
 
+const REMAKE_MAX_DURATION_SECONDS = 5 * 60;
+
 interface LcuMatchHistoryResponse {
   games?: {
     games?: unknown[];
@@ -95,6 +97,7 @@ function parseGame(
   const deaths = normalizeNumber(stats.deaths ?? stats.numDeaths);
   const assists = normalizeNumber(stats.assists);
   const queueId = game.queueId;
+  const durationSeconds = normalizeDuration(game.gameDuration);
 
   return {
     assists,
@@ -102,14 +105,14 @@ function parseGame(
     championName: participant.championName ?? championNames.get(championId) ?? `Champion ${championId}`,
     createdAt,
     deaths,
-    durationSeconds: normalizeDuration(game.gameDuration),
+    durationSeconds,
     gameId: game.gameId,
     gold: normalizeOptionalNumber(stats.goldEarned),
     kdaRatio: getKdaRatio(kills, deaths, assists),
     kills,
     queueId,
     queueName: getQueueName(queueId),
-    result: parseResult(stats.win),
+    result: parseResult(stats.win, durationSeconds),
     cs: normalizeNumber(stats.totalMinionsKilled) + normalizeNumber(stats.neutralMinionsKilled)
   };
 }
@@ -171,7 +174,11 @@ function normalizeDuration(duration: number | undefined) {
   return normalized > 100_000 ? Math.floor(normalized / 1000) : normalized;
 }
 
-function parseResult(value: boolean | string | number | undefined): MatchSummary["result"] {
+function parseResult(value: boolean | string | number | undefined, durationSeconds: number): MatchSummary["result"] {
+  if (isRemakeDuration(durationSeconds)) {
+    return "remake";
+  }
+
   if (typeof value === "boolean") {
     return value ? "win" : "loss";
   }
@@ -204,6 +211,10 @@ function parseResult(value: boolean | string | number | undefined): MatchSummary
   }
 
   return "unknown";
+}
+
+function isRemakeDuration(durationSeconds: number) {
+  return durationSeconds > 0 && durationSeconds < REMAKE_MAX_DURATION_SECONDS;
 }
 
 function getKdaRatio(kills: number, deaths: number, assists: number) {
