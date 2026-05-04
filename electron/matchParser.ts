@@ -84,8 +84,6 @@ interface LcuParticipant {
     position?: string;
     role?: string;
     selectedPosition?: string;
-    spell1Id?: LcuNumericStat;
-    spell2Id?: LcuNumericStat;
     summoner1Id?: LcuNumericStat;
     summoner2Id?: LcuNumericStat;
     summonerSpell1Id?: LcuNumericStat;
@@ -180,16 +178,39 @@ function parseGame(
 }
 
 function parseRole(participant: LcuParticipant, supportItemIds: Set<number>): MatchRole {
-  if (hasSmite(participant)) {
-    return "jungle";
-  }
-
   if (hasSupportItem(participant, supportItemIds)) {
     return "support";
   }
 
+  const laneRole = getClientLaneRole(participant);
+
+  if (laneRole === "top" || laneRole === "middle" || laneRole === "bottom") {
+    return laneRole;
+  }
+
+  if (hasSmite(participant)) {
+    return "jungle";
+  }
+
+  return "unknown";
+}
+
+function getClientLaneRole(participant: LcuParticipant): MatchRole {
+  for (const candidate of getRoleCandidates(participant)) {
+    const role = normalizeRole(candidate);
+
+    if (role !== "unknown") {
+      return role;
+    }
+  }
+
+  return "unknown";
+}
+
+function getRoleCandidates(participant: LcuParticipant) {
   const stats = participant.stats;
-  const roleCandidates = [
+
+  return [
     participant.teamPosition,
     participant.individualPosition,
     participant.assignedPosition,
@@ -211,16 +232,6 @@ function parseRole(participant: LcuParticipant, supportItemIds: Set<number>): Ma
     participant.role,
     participant.playerRole
   ];
-
-  for (const candidate of roleCandidates) {
-    const role = normalizeRole(candidate);
-
-    if (role === "top" || role === "middle" || role === "bottom") {
-      return role;
-    }
-  }
-
-  return "unknown";
 }
 
 function hasSmite(participant: LcuParticipant) {
@@ -233,6 +244,7 @@ function hasSupportItem(participant: LcuParticipant, supportItemIds: Set<number>
 }
 
 function getSummonerSpellIds(participant: LcuParticipant) {
+  // LCU match-history stats can expose spell1Id/spell2Id fields that are not reliable summoner-spell ids.
   return getNumericFields(participant, [
     "spell1Id",
     "spell2Id",
@@ -242,8 +254,6 @@ function getSummonerSpellIds(participant: LcuParticipant) {
     "summonerSpell2Id"
   ]).concat(
     getNumericFields(participant.stats, [
-      "spell1Id",
-      "spell2Id",
       "summoner1Id",
       "summoner2Id",
       "summonerSpell1Id",
