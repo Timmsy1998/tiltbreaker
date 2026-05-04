@@ -49,13 +49,18 @@ type LcuNumericStat = number | string;
 
 interface LcuParticipant {
   accountId?: number;
+  assignedPosition?: string;
   championId?: number;
   championName?: string;
   individualPosition?: string;
   lane?: string;
   participantId?: number;
+  playerPosition?: string;
+  playerRole?: string;
+  position?: string;
   puuid?: string;
   role?: string;
+  selectedPosition?: string;
   spell1Id?: LcuNumericStat;
   spell2Id?: LcuNumericStat;
   summoner1Id?: LcuNumericStat;
@@ -69,15 +74,23 @@ interface LcuParticipant {
     championsKilled?: LcuNumericStat;
     deaths?: LcuNumericStat;
     goldEarned?: LcuNumericStat;
+    individualPosition?: string;
     kills?: LcuNumericStat;
+    lane?: string;
     neutralMinionsKilled?: LcuNumericStat;
     numDeaths?: LcuNumericStat;
+    playerPosition?: string;
+    playerRole?: string;
+    position?: string;
+    role?: string;
+    selectedPosition?: string;
     spell1Id?: LcuNumericStat;
     spell2Id?: LcuNumericStat;
     summoner1Id?: LcuNumericStat;
     summoner2Id?: LcuNumericStat;
     summonerSpell1Id?: LcuNumericStat;
     summonerSpell2Id?: LcuNumericStat;
+    teamPosition?: string;
     totalMinionsKilled?: LcuNumericStat;
     win?: boolean | string | number;
   };
@@ -175,13 +188,28 @@ function parseRole(participant: LcuParticipant, supportItemIds: Set<number>): Ma
     return "support";
   }
 
+  const stats = participant.stats;
   const roleCandidates = [
     participant.teamPosition,
     participant.individualPosition,
+    participant.assignedPosition,
+    participant.selectedPosition,
+    participant.playerPosition,
+    participant.position,
     getTimelineRole(participant.timeline?.lane, participant.timeline?.role),
     getTimelineRole(participant.lane, participant.role),
+    getTimelineRole(stats?.lane, stats?.role),
+    stats?.teamPosition,
+    stats?.individualPosition,
+    stats?.selectedPosition,
+    stats?.playerPosition,
+    stats?.position,
+    stats?.playerRole,
+    stats?.lane,
+    stats?.role,
     participant.lane,
-    participant.role
+    participant.role,
+    participant.playerRole
   ];
 
   for (const candidate of roleCandidates) {
@@ -239,7 +267,7 @@ function getNumericFields(source: unknown, keys: string[]) {
 }
 
 function getTimelineRole(lane?: string, role?: string) {
-  const normalizedLane = lane?.trim().toUpperCase();
+  const normalizedLane = normalizeRoleText(lane);
   const normalizedRole = role?.trim().toUpperCase();
 
   if (normalizedLane === "BOTTOM" && normalizedRole === "DUO_SUPPORT") {
@@ -254,25 +282,41 @@ function getTimelineRole(lane?: string, role?: string) {
 }
 
 function normalizeRole(value?: string): MatchRole {
-  const normalized = value?.trim().toUpperCase();
+  const normalized = normalizeRoleText(value);
 
   if (!normalized || normalized === "NONE" || normalized === "INVALID" || normalized === "UNSELECTED") {
     return "unknown";
   }
 
-  if (normalized === "TOP") {
+  if (normalized === "TOP" || normalized === "TOPLANE" || normalized === "TOP_LANE") {
     return "top";
   }
 
-  if (normalized === "JUNGLE") {
+  if (normalized === "JUNGLE" || normalized === "JUNGLER" || normalized === "JUNGLE_LANE") {
     return "jungle";
   }
 
-  if (normalized === "MID" || normalized === "MIDDLE") {
+  if (
+    normalized === "MID" ||
+    normalized === "MIDDLE" ||
+    normalized === "CENTER" ||
+    normalized === "MIDLANE" ||
+    normalized === "MID_LANE" ||
+    normalized === "MIDDLE_LANE"
+  ) {
     return "middle";
   }
 
-  if (normalized === "BOT" || normalized === "BOTTOM" || normalized === "ADC" || normalized === "DUO_CARRY") {
+  if (
+    normalized === "BOT" ||
+    normalized === "BOTTOM" ||
+    normalized === "ADC" ||
+    normalized === "CARRY" ||
+    normalized === "BOTLANE" ||
+    normalized === "BOT_LANE" ||
+    normalized === "BOTTOM_LANE" ||
+    normalized === "DUO_CARRY"
+  ) {
     return "bottom";
   }
 
@@ -281,6 +325,10 @@ function normalizeRole(value?: string): MatchRole {
   }
 
   return "unknown";
+}
+
+function normalizeRoleText(value?: string) {
+  return value?.trim().toUpperCase().replace(/[\s-]+/g, "_");
 }
 
 function findParticipantId(game: LcuGame, summoner: SummonerInfo) {
