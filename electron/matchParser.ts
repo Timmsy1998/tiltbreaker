@@ -2,6 +2,32 @@ import { getQueueName } from "./queueRules";
 import type { MatchRole, MatchSummary, SummonerInfo } from "./types";
 
 const REMAKE_MAX_DURATION_SECONDS = 5 * 60;
+const SMITE_SUMMONER_SPELL_IDS = new Set([11]);
+const KNOWN_SUPPORT_ITEM_IDS = new Set([
+  3301,
+  3302,
+  3303,
+  3850,
+  3851,
+  3853,
+  3854,
+  3855,
+  3857,
+  3858,
+  3859,
+  3860,
+  3862,
+  3863,
+  3864,
+  3865,
+  3866,
+  3867,
+  3869,
+  3870,
+  3871,
+  3876,
+  3877
+]);
 
 interface LcuMatchHistoryResponse {
   games?: {
@@ -30,6 +56,12 @@ interface LcuParticipant {
   participantId?: number;
   puuid?: string;
   role?: string;
+  spell1Id?: LcuNumericStat;
+  spell2Id?: LcuNumericStat;
+  summoner1Id?: LcuNumericStat;
+  summoner2Id?: LcuNumericStat;
+  summonerSpell1Id?: LcuNumericStat;
+  summonerSpell2Id?: LcuNumericStat;
   summonerId?: number;
   summonerName?: string;
   stats?: {
@@ -40,6 +72,12 @@ interface LcuParticipant {
     kills?: LcuNumericStat;
     neutralMinionsKilled?: LcuNumericStat;
     numDeaths?: LcuNumericStat;
+    spell1Id?: LcuNumericStat;
+    spell2Id?: LcuNumericStat;
+    summoner1Id?: LcuNumericStat;
+    summoner2Id?: LcuNumericStat;
+    summonerSpell1Id?: LcuNumericStat;
+    summonerSpell2Id?: LcuNumericStat;
     totalMinionsKilled?: LcuNumericStat;
     win?: boolean | string | number;
   };
@@ -68,7 +106,8 @@ interface LcuIdentity {
 export function parseMatches(
   response: unknown,
   summoner: SummonerInfo | undefined,
-  championNames = new Map<number, string>()
+  championNames = new Map<number, string>(),
+  supportItemIds = new Set<number>()
 ) {
   const history = response as LcuMatchHistoryResponse | undefined;
   const games = history?.games?.games;
@@ -78,14 +117,15 @@ export function parseMatches(
   }
 
   return games
-    .map((game) => parseGame(game as LcuGame, summoner, championNames))
+    .map((game) => parseGame(game as LcuGame, summoner, championNames, supportItemIds))
     .filter((match): match is MatchSummary => Boolean(match));
 }
 
 function parseGame(
   game: LcuGame,
   summoner: SummonerInfo,
-  championNames: Map<number, string>
+  championNames: Map<number, string>,
+  supportItemIds: Set<number>
 ): MatchSummary | undefined {
   if (!game.gameId) {
     return undefined;
@@ -121,12 +161,20 @@ function parseGame(
     queueId,
     queueName: getQueueName(queueId),
     result: parseResult(stats.win, durationSeconds),
-    role: parseRole(participant),
+    role: parseRole(participant, supportItemIds),
     cs: normalizeNumber(stats.totalMinionsKilled) + normalizeNumber(stats.neutralMinionsKilled)
   };
 }
 
-function parseRole(participant: LcuParticipant): MatchRole {
+function parseRole(participant: LcuParticipant, supportItemIds: Set<number>): MatchRole {
+  if (hasSmite(participant)) {
+    return "jungle";
+  }
+
+  if (hasSupportItem(participant, supportItemIds)) {
+    return "support";
+  }
+
   const roleCandidates = [
     participant.teamPosition,
     participant.individualPosition,
@@ -139,12 +187,55 @@ function parseRole(participant: LcuParticipant): MatchRole {
   for (const candidate of roleCandidates) {
     const role = normalizeRole(candidate);
 
-    if (role !== "unknown") {
+    if (role === "top" || role === "middle" || role === "bottom") {
       return role;
     }
   }
 
   return "unknown";
+}
+
+function hasSmite(participant: LcuParticipant) {
+  return getSummonerSpellIds(participant).some((spellId) => SMITE_SUMMONER_SPELL_IDS.has(spellId));
+}
+
+function hasSupportItem(participant: LcuParticipant, supportItemIds: Set<number>) {
+  const knownSupportItemIds = new Set([...KNOWN_SUPPORT_ITEM_IDS, ...supportItemIds]);
+  return getParticipantItemIds(participant).some((itemId) => knownSupportItemIds.has(itemId));
+}
+
+function getSummonerSpellIds(participant: LcuParticipant) {
+  return getNumericFields(participant, [
+    "spell1Id",
+    "spell2Id",
+    "summoner1Id",
+    "summoner2Id",
+    "summonerSpell1Id",
+    "summonerSpell2Id"
+  ]).concat(
+    getNumericFields(participant.stats, [
+      "spell1Id",
+      "spell2Id",
+      "summoner1Id",
+      "summoner2Id",
+      "summonerSpell1Id",
+      "summonerSpell2Id"
+    ])
+  );
+}
+
+function getParticipantItemIds(participant: LcuParticipant) {
+  const itemKeys = ["item0", "item1", "item2", "item3", "item4", "item5", "item6"];
+  return getNumericFields(participant, itemKeys).concat(getNumericFields(participant.stats, itemKeys));
+}
+
+function getNumericFields(source: unknown, keys: string[]) {
+  if (!source || typeof source !== "object") {
+    return [];
+  }
+
+  const record = source as Record<string, unknown>;
+  return keys.map((key) => normalizeNumber(record[key])).filter((value) => value > 0);
 }
 
 function getTimelineRole(lane?: string, role?: string) {

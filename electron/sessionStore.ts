@@ -520,7 +520,12 @@ function mergeMatchStats(stored: MatchSummary, incoming: MatchSummary): MatchSum
     merged.result = storedMatch.result;
   }
 
-  if (incomingMatch.role === "unknown" && storedMatch.role !== "unknown") {
+  if (
+    incomingMatch.role === "unknown" &&
+    storedMatch.role !== "unknown" &&
+    storedMatch.role !== "jungle" &&
+    storedMatch.role !== "support"
+  ) {
     merged.role = storedMatch.role;
   }
 

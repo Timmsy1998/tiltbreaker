@@ -41,6 +41,17 @@ interface ChampionSummaryEntry {
   name?: string;
 }
 
+interface ItemSummaryEntry {
+  categories?: string[];
+  description?: string;
+  id?: number;
+  itemId?: number;
+  itemID?: number;
+  name?: string;
+  requiredAlly?: string;
+  tags?: string[];
+}
+
 protocol.registerSchemesAsPrivileged([
   {
     scheme: "tiltbreaker-lcu",
@@ -73,6 +84,8 @@ let pollTimer: NodeJS.Timeout | undefined;
 let isQuitting = false;
 let championNames = new Map<number, string>();
 let championNamesLoadedAt = 0;
+let supportItemIds = new Set<number>();
+let supportItemIdsLoadedAt = 0;
 let polling = false;
 let notificationState: {
   breakActive: boolean;
@@ -357,9 +370,9 @@ async function pollLcu() {
 
     if (summoner) {
       try {
-        const names = await getChampionNames();
+        const [names, supportItems] = await Promise.all([getChampionNames(), getSupportItemIds()]);
         const matchHistory = await getMatchHistory(summoner);
-        store.mergeMatches(parseMatches(matchHistory, summoner, names));
+        store.mergeMatches(parseMatches(matchHistory, summoner, names, supportItems));
       } catch {
         store.mergeMatches([]);
       }
@@ -601,6 +614,76 @@ async function getChampionNames() {
   }
 
   return championNames;
+}
+
+async function getSupportItemIds() {
+  const staleAfterMs = 60 * 60 * 1000;
+
+  if (supportItemIds.size && Date.now() - supportItemIdsLoadedAt < staleAfterMs) {
+    return supportItemIds;
+  }
+
+  try {
+    const response = await lcu.requestJson<unknown>("/lol-game-data/assets/v1/items.json");
+    const itemIds = parseSupportItemIds(response);
+
+    if (itemIds.size) {
+      supportItemIds = itemIds;
+      supportItemIdsLoadedAt = Date.now();
+    }
+  } catch {
+    return supportItemIds;
+  }
+
+  return supportItemIds;
+}
+
+function parseSupportItemIds(response: unknown) {
+  const itemIds = new Set<number>();
+
+  for (const entry of getItemEntries(response)) {
+    const item = entry as ItemSummaryEntry;
+    const id = normalizeNumber(item.id ?? item.itemId ?? item.itemID);
+
+    if (id && isSupportItemEntry(item)) {
+      itemIds.add(id);
+    }
+  }
+
+  return itemIds;
+}
+
+function getItemEntries(response: unknown): unknown[] {
+  if (Array.isArray(response)) {
+    return response;
+  }
+
+  if (!response || typeof response !== "object") {
+    return [];
+  }
+
+  return Object.values(response);
+}
+
+function isSupportItemEntry(item: ItemSummaryEntry) {
+  const searchText = [
+    item.name,
+    item.description,
+    item.requiredAlly,
+    ...(item.categories ?? []),
+    ...(item.tags ?? [])
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return (
+    searchText.includes("support") ||
+    searchText.includes("support quest") ||
+    searchText.includes("world atlas") ||
+    searchText.includes("runic compass") ||
+    searchText.includes("bounty of worlds")
+  );
 }
 
 async function getMatchHistory(summoner: SummonerInfo) {

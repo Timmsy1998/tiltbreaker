@@ -16,7 +16,7 @@ Start a BO3 or BO5 session, play your Summoner's Rift games, then take a one or 
 - Session notes for active, break, and completed sessions
 - Trend dashboard with LP, result, champion, and role graphs
 - Responsive desktop layout with light and dark appearance modes
-- Recent match history with champion, role, queue, KDA, CS, gold, and result
+- Recent match history with champion, inferred role, queue, KDA, CS, gold, and result
 - Ranked LP tracking for the current session and day
 - Completed session history
 - Optional start with Windows
@@ -71,6 +71,8 @@ The installer is written to `release/`. The unpacked executable is written to `r
 When the session finishes, TiltBreaker starts the break timer and closes the Summoner's Rift gate until the break is over. You can still play non-Summoner's Rift modes during that time.
 
 Use `Session Notes` to save local notes against the current session or a past session. Use `Contact Developer` to open Discord for `fatbaldbrit`.
+
+Match roles are inferred from match details: Smite marks jungle, support items mark support, and the League Client position is used for top, mid, and bot.
 
 If the app cannot find the League Client automatically, click `Lockfile` and select the client's `lockfile` manually.
 
