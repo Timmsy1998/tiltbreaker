@@ -3,6 +3,52 @@ import type { MatchRole, MatchSummary, SummonerInfo } from "./types";
 
 const REMAKE_MAX_DURATION_SECONDS = 5 * 60;
 const SMITE_SUMMONER_SPELL_IDS = new Set([11]);
+const TOP_LANE_FALLBACK_CHAMPION_IDS = new Set([
+  2,
+  6,
+  8,
+  14,
+  17,
+  23,
+  24,
+  27,
+  31,
+  36,
+  39,
+  41,
+  48,
+  54,
+  57,
+  58,
+  62,
+  68,
+  75,
+  78,
+  79,
+  80,
+  82,
+  83,
+  85,
+  86,
+  92,
+  98,
+  106,
+  107,
+  114,
+  122,
+  126,
+  133,
+  150,
+  164,
+  240,
+  266,
+  420,
+  516,
+  777,
+  875,
+  887,
+  897
+]);
 const KNOWN_SUPPORT_ITEM_IDS = new Set([
   3301,
   3302,
@@ -172,12 +218,12 @@ function parseGame(
     queueId,
     queueName: getQueueName(queueId),
     result: parseResult(stats.win, durationSeconds),
-    role: parseRole(participant, supportItemIds),
+    role: parseRole(participant, championId, supportItemIds),
     cs: normalizeNumber(stats.totalMinionsKilled) + normalizeNumber(stats.neutralMinionsKilled)
   };
 }
 
-function parseRole(participant: LcuParticipant, supportItemIds: Set<number>): MatchRole {
+function parseRole(participant: LcuParticipant, championId: number, supportItemIds: Set<number>): MatchRole {
   if (hasSupportItem(participant, supportItemIds)) {
     return "support";
   }
@@ -190,6 +236,10 @@ function parseRole(participant: LcuParticipant, supportItemIds: Set<number>): Ma
 
   if (hasSmite(participant)) {
     return "jungle";
+  }
+
+  if (TOP_LANE_FALLBACK_CHAMPION_IDS.has(championId)) {
+    return "top";
   }
 
   return "unknown";
