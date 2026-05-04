@@ -259,7 +259,7 @@ export class SessionStore {
 
   mergeMatches(matches: MatchSummary[]) {
     const incomingMatches = uniqueMatches(matches);
-    this.state.recentMatches = uniqueMatches([...incomingMatches, ...this.state.recentMatches]).slice(0, 12);
+    this.state.recentMatches = uniqueMatches([...this.state.recentMatches, ...incomingMatches]).slice(0, 12);
     this.refreshStoredSessionMatches(incomingMatches);
 
     if (this.state.series.status !== "active" || !this.state.series.startedAt) {
