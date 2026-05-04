@@ -4,6 +4,25 @@
 
 :root {
   color-scheme: dark;
+  --color-app: 16 18 22;
+  --color-sidebar: 17 19 24;
+  --color-panel: 21 24 29;
+  --color-surface: 24 28 34;
+  --color-surface-high: 27 32 39;
+  --color-elevated: 9 10 13;
+  --color-muted-surface: 37 42 50;
+  --color-ink: 238 242 243;
+  --color-muted: 141 150 163;
+  --color-line: 42 48 56;
+  --color-accent-line: 52 40 74;
+  --color-logo-surface: 9 10 13;
+  --color-hover-line: 59 67 80;
+  --color-brand-purple: 138 63 252;
+  --color-brand-orange: 255 159 26;
+  --color-good: 39 192 125;
+  --color-warn: 232 170 59;
+  --color-bad: 236 95 103;
+  --color-info: 77 163 255;
   font-family:
     Inter,
     ui-sans-serif,
@@ -18,15 +37,38 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+:root[data-theme="light"] {
+  color-scheme: light;
+  --color-app: 246 248 251;
+  --color-sidebar: 255 255 255;
+  --color-panel: 255 255 255;
+  --color-surface: 248 250 252;
+  --color-surface-high: 241 245 249;
+  --color-elevated: 255 255 255;
+  --color-muted-surface: 226 232 240;
+  --color-ink: 17 24 39;
+  --color-muted: 88 101 119;
+  --color-line: 209 216 226;
+  --color-accent-line: 220 202 247;
+  --color-logo-surface: 255 255 255;
+  --color-hover-line: 148 163 184;
+  --color-brand-purple: 111 60 200;
+  --color-brand-orange: 205 115 0;
+  --color-good: 16 128 84;
+  --color-warn: 176 111 0;
+  --color-bad: 190 48 62;
+  --color-info: 36 112 190;
+}
+
 * {
   box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  min-width: 1024px;
-  min-height: 680px;
-  background: #101216;
+  min-width: 0;
+  min-height: 100vh;
+  background: rgb(var(--color-app));
 }
 
 button,
@@ -42,6 +84,6 @@ button {
 button:focus-visible,
 input:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid #ff9f1a;
+  outline: 2px solid rgb(var(--color-brand-orange));
   outline-offset: 2px;
 }

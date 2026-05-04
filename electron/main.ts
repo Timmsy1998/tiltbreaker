@@ -88,10 +88,10 @@ async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1220,
     height: 780,
-    minWidth: 1024,
-    minHeight: 680,
+    minWidth: 520,
+    minHeight: 560,
     autoHideMenuBar: true,
-    backgroundColor: "#101216",
+    backgroundColor: getWindowBackgroundColor(),
     icon: getIconPath("ico"),
     title: "TiltBreaker",
     webPreferences: {
@@ -120,8 +120,8 @@ async function createWindow() {
 app.whenReady().then(async () => {
   app.setAppUserModelId("app.tiltbreaker.desktop");
   Menu.setApplicationMenu(null);
-  nativeTheme.themeSource = "dark";
   store = new SessionStore(join(app.getPath("userData"), "tiltbreaker-state.json"));
+  syncNativeTheme();
   lcu.setPreferredLockfilePath(store.settings.lockfilePath);
   queueGuard = {
     ...queueGuard,
@@ -197,6 +197,15 @@ function getIconPath(type: "ico" | "png") {
   return join(__dirname, `../build/icon.${type}`);
 }
 
+function syncNativeTheme() {
+  nativeTheme.themeSource = store.settings.appearanceMode;
+  mainWindow?.setBackgroundColor(getWindowBackgroundColor());
+}
+
+function getWindowBackgroundColor() {
+  return store?.settings.appearanceMode === "light" ? "#f6f8fb" : "#101216";
+}
+
 function syncAutoStartSetting() {
   if (process.platform !== "win32") {
     return;
@@ -244,6 +253,10 @@ function registerIpc() {
     };
     if (typeof settings.autoStartEnabled === "boolean") {
       syncAutoStartSetting();
+    }
+
+    if (typeof settings.appearanceMode === "string") {
+      syncNativeTheme();
     }
 
     return snapshotWithNotifications();

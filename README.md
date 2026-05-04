@@ -15,6 +15,7 @@ Start a BO3 or BO5 session, play your Summoner's Rift games, then take a one or 
 - Dedicated break screen with countdown progress
 - Session notes for active, break, and completed sessions
 - Trend dashboard with LP, result, champion, and role graphs
+- Responsive desktop layout with light and dark appearance modes
 - Recent match history with champion, role, queue, KDA, CS, gold, and result
 - Ranked LP tracking for the current session and day
 - Completed session history

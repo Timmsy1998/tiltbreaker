@@ -15,6 +15,7 @@ export type LcuPhase =
 export type QueueGate = "open" | "closed" | "unavailable";
 export type SeriesBestOf = 3 | 5;
 export type MatchRole = "top" | "jungle" | "middle" | "bottom" | "support" | "unknown";
+export type AppearanceMode = "dark" | "light";
 
 export interface SummonerInfo {
   accountId?: number;
@@ -110,6 +111,7 @@ export interface CompletedSession {
 }
 
 export interface TiltBreakerSettings {
+  appearanceMode: AppearanceMode;
   autoStartEnabled: boolean;
   bestOf: SeriesBestOf;
   breakMinutes: number;

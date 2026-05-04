@@ -35,6 +35,7 @@ const defaultState: PersistedState = {
     wins: 0
   },
   settings: {
+    appearanceMode: "dark",
     autoStartEnabled: false,
     bestOf: 3,
     breakMinutes: 60,

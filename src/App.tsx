@@ -6,12 +6,14 @@ import {
   History,
   Lock,
   MessageCircle,
+  Moon,
   Play,
   Power,
   RotateCcw,
   Save,
   ShieldCheck,
   StickyNote,
+  Sun,
   Swords,
   TimerReset,
   Trophy,
@@ -23,6 +25,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getQueueName } from "../electron/queueRules";
 import type {
+  AppearanceMode,
   AppSnapshot,
   CompletedSession,
   LpDayState,
@@ -53,6 +56,7 @@ const emptySnapshot: AppSnapshot = {
     wins: 0
   },
   settings: {
+    appearanceMode: "dark",
     autoStartEnabled: false,
     bestOf: 3,
     breakMinutes: 60,
@@ -63,6 +67,10 @@ const emptySnapshot: AppSnapshot = {
 
 const seriesOptions = [3, 5] as const;
 const breakOptions = [60, 120] as const;
+const appearanceOptions: Array<{ icon: React.ReactNode; label: string; mode: AppearanceMode }> = [
+  { icon: <Moon size={16} />, label: "Dark", mode: "dark" },
+  { icon: <Sun size={16} />, label: "Light", mode: "light" }
+];
 
 interface ChartPoint {
   label: string;
@@ -108,6 +116,10 @@ export default function App() {
     return () => window.clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    document.documentElement.dataset.theme = snapshot.settings.appearanceMode;
+  }, [snapshot.settings.appearanceMode]);
+
   const breakRemaining = useMemo(() => {
     if (!snapshot.series.breakUntil) {
       return 0;
@@ -138,10 +150,10 @@ export default function App() {
   }
 
   return (
-    <main className="min-h-screen bg-[#101216] text-ink">
-      <div className="grid min-h-screen grid-cols-[320px_minmax(0,1fr)]">
-        <aside className="overflow-y-auto border-r border-line bg-[#111318] px-5 py-5">
-          <div className="relative overflow-hidden rounded-lg border border-[#34284a] bg-[#090a0d] p-2 shadow-[0_0_36px_rgba(255,159,26,0.10)]">
+    <main className="min-h-screen bg-app text-ink">
+      <div className="min-h-screen lg:grid lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]">
+        <aside className="border-b border-line bg-sidebar px-4 py-4 sm:px-5 lg:max-h-screen lg:overflow-y-auto lg:border-b-0 lg:border-r">
+          <div className="relative overflow-hidden rounded-lg border border-accentLine bg-logoSurface p-2 shadow-[0_0_36px_rgba(255,159,26,0.10)]">
             <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brandPurple via-[#f1f1f1] to-brandOrange" />
             <img
               alt="TiltBreaker - Queue smart. Not tilted."
@@ -181,7 +193,7 @@ export default function App() {
                   className={`h-10 rounded-md border text-sm font-medium transition ${
                     snapshot.settings.bestOf === bestOf
                       ? "border-brandOrange bg-brandOrange/15 text-brandOrange"
-                      : "border-line bg-[#181c22] text-muted hover:border-[#3b4350] hover:text-ink"
+                      : "border-line bg-surface text-muted hover:border-hoverLine hover:text-ink"
                   }`}
                   key={bestOf}
                   onClick={() => withSnapshot(window.tiltbreaker.updateSettings({ bestOf }))}
@@ -199,7 +211,7 @@ export default function App() {
                   className={`h-10 rounded-md border text-sm font-medium transition ${
                     snapshot.settings.breakMinutes === minutes
                       ? "border-brandOrange bg-brandOrange/15 text-brandOrange"
-                      : "border-line bg-[#181c22] text-muted hover:border-[#3b4350] hover:text-ink"
+                      : "border-line bg-surface text-muted hover:border-hoverLine hover:text-ink"
                   }`}
                   key={minutes}
                   onClick={() => withSnapshot(window.tiltbreaker.updateSettings({ breakMinutes: minutes }))}
@@ -210,7 +222,26 @@ export default function App() {
               ))}
             </div>
 
-            <label className="mt-4 flex min-h-11 items-center justify-between rounded-md border border-line bg-[#181c22] px-3 text-sm">
+            <p className="mt-4 text-xs font-medium uppercase tracking-[0.12em] text-muted">Appearance</p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {appearanceOptions.map(({ icon, label, mode }) => (
+                <button
+                  className={`flex h-10 items-center justify-center gap-2 rounded-md border text-sm font-medium transition ${
+                    snapshot.settings.appearanceMode === mode
+                      ? "border-brandOrange bg-brandOrange/15 text-brandOrange"
+                      : "border-line bg-surface text-muted hover:border-hoverLine hover:text-ink"
+                  }`}
+                  key={mode}
+                  onClick={() => withSnapshot(window.tiltbreaker.updateSettings({ appearanceMode: mode }))}
+                  type="button"
+                >
+                  {icon}
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <label className="mt-4 flex min-h-11 items-center justify-between rounded-md border border-line bg-surface px-3 text-sm">
               <span className="flex items-center gap-2 text-muted">
                 <ShieldCheck size={17} />
                 Queue guard
@@ -224,7 +255,7 @@ export default function App() {
                 type="checkbox"
               />
             </label>
-            <label className="mt-2 flex min-h-11 items-center justify-between rounded-md border border-line bg-[#181c22] px-3 text-sm">
+            <label className="mt-2 flex min-h-11 items-center justify-between rounded-md border border-line bg-surface px-3 text-sm">
               <span className="flex items-center gap-2 text-muted">
                 <Bell size={17} />
                 Notifications
@@ -242,7 +273,7 @@ export default function App() {
 
           <section className="mt-6 border-t border-line pt-5">
             <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">Client</h2>
-            <label className="mt-3 flex min-h-11 items-center justify-between rounded-md border border-line bg-[#181c22] px-3 text-sm">
+            <label className="mt-3 flex min-h-11 items-center justify-between rounded-md border border-line bg-surface px-3 text-sm">
               <span className="flex items-center gap-2 text-muted">
                 <Power size={17} />
                 Start with Windows
@@ -257,7 +288,7 @@ export default function App() {
               />
             </label>
             <button
-              className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-md border border-line bg-[#181c22] text-sm font-medium text-ink hover:border-[#3b4350]"
+              className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-md border border-line bg-surface text-sm font-medium text-ink hover:border-hoverLine"
               onClick={() => withSnapshot(window.tiltbreaker.selectLockfile())}
               type="button"
             >
@@ -265,7 +296,7 @@ export default function App() {
               Lockfile
             </button>
             <button
-              className="mt-2 flex h-10 w-full items-center justify-center gap-2 rounded-md border border-line bg-[#181c22] text-sm font-medium text-ink hover:border-[#3b4350]"
+              className="mt-2 flex h-10 w-full items-center justify-center gap-2 rounded-md border border-line bg-surface text-sm font-medium text-ink hover:border-hoverLine"
               onClick={() => void window.tiltbreaker.contactDeveloper()}
               type="button"
             >
@@ -280,7 +311,7 @@ export default function App() {
         </aside>
 
         <section className="min-w-0">
-          <header className="flex min-h-[88px] items-center justify-between border-b border-line bg-[#111318] px-8">
+          <header className="flex min-h-[88px] flex-col items-stretch justify-between gap-4 border-b border-line bg-sidebar px-4 py-4 sm:flex-row sm:items-center sm:px-6 lg:px-8">
             <div className="flex min-w-0 items-center gap-4">
               <ProfileIcon profileIconId={snapshot.lcu.summoner?.profileIconId} />
               <div className="min-w-0">
@@ -291,9 +322,9 @@ export default function App() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
               <button
-                className="flex h-10 items-center gap-2 rounded-md border border-brandOrange/50 bg-brandOrange/15 px-4 text-sm font-semibold text-brandOrange hover:border-brandOrange disabled:cursor-not-allowed disabled:border-line disabled:bg-[#181c22] disabled:text-muted"
+                className="flex h-10 flex-1 items-center justify-center gap-2 rounded-md border border-brandOrange/50 bg-brandOrange/15 px-4 text-sm font-semibold text-brandOrange hover:border-brandOrange disabled:cursor-not-allowed disabled:border-line disabled:bg-surface disabled:text-muted sm:flex-none"
                 disabled={!canStartSeries}
                 onClick={() => withSnapshot(window.tiltbreaker.startSeries())}
                 type="button"
@@ -302,7 +333,7 @@ export default function App() {
                 {isBreakActive ? `Break ${formatDuration(breakRemaining)}` : `Start BO${snapshot.settings.bestOf}`}
               </button>
               <button
-                className="grid size-10 place-items-center rounded-md border border-line bg-[#181c22] text-muted hover:border-[#3b4350] hover:text-ink"
+                className="grid size-10 place-items-center rounded-md border border-line bg-surface text-muted hover:border-hoverLine hover:text-ink"
                 onClick={() => withSnapshot(window.tiltbreaker.cancelQueue())}
                 title="Stop queue"
                 type="button"
@@ -312,7 +343,7 @@ export default function App() {
             </div>
           </header>
 
-          <div className="grid grid-cols-[minmax(0,1fr)_360px] gap-6 p-8">
+          <div className="grid gap-5 p-4 sm:p-6 xl:grid-cols-[minmax(0,1fr)_360px] xl:gap-6 xl:p-8">
             <section className="min-w-0 space-y-6">
               {isBreakActive ? (
                 <BreakScreen
@@ -341,7 +372,7 @@ export default function App() {
                       </div>
                       {snapshot.series.status === "active" ? (
                         <button
-                          className="flex h-9 items-center gap-2 rounded-md border border-line bg-[#1b2027] px-3 text-sm text-muted hover:text-ink"
+                          className="flex h-9 items-center gap-2 rounded-md border border-line bg-surfaceHigh px-3 text-sm text-muted hover:text-ink"
                           onClick={() => withSnapshot(window.tiltbreaker.endSeries())}
                           type="button"
                         >
@@ -350,7 +381,7 @@ export default function App() {
                         </button>
                       ) : (
                         <button
-                          className="flex h-9 items-center gap-2 rounded-md border border-line bg-[#1b2027] px-3 text-sm text-muted hover:text-ink disabled:cursor-not-allowed disabled:text-muted/60"
+                          className="flex h-9 items-center gap-2 rounded-md border border-line bg-surfaceHigh px-3 text-sm text-muted hover:text-ink disabled:cursor-not-allowed disabled:text-muted/60"
                           disabled={isBreakActive}
                           onClick={() => withSnapshot(window.tiltbreaker.clearBreak())}
                           title={isBreakActive ? "Break timer is still running" : "Reset series"}
@@ -403,7 +434,7 @@ export default function App() {
                     <h2 className="font-semibold">Guard Activity</h2>
                     <p className="mt-1 text-sm text-muted">{snapshot.queueGuard.lastBlockedReason ?? "No blocks yet"}</p>
                   </div>
-                  <div className="grid size-10 place-items-center rounded-lg border border-line bg-[#1b2027] text-warn">
+                  <div className="grid size-10 place-items-center rounded-lg border border-line bg-surfaceHigh text-warn">
                     <Lock size={18} />
                   </div>
                 </div>
@@ -432,13 +463,13 @@ function SeriesPanel({
   const bestOf = series.bestOf ?? settingsBestOf;
   const countedGames = getCountedSeriesGames(series.games);
   const activeSlotCount = Math.max(bestOf, countedGames.length);
-  const slotGridClass = bestOf === 5 ? "grid-cols-5" : "grid-cols-3 max-w-[340px]";
+  const slotGridClass = bestOf === 5 ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5" : "grid-cols-3 sm:max-w-[340px]";
   const statusLabel =
     series.status === "active" ? `Active BO${bestOf}` : series.status === "break" ? "Break window" : `Ready for BO${bestOf}`;
   const detailLabel = getSeriesDetailLabel(series);
 
   return (
-    <section className="relative overflow-hidden rounded-lg border border-[#34284a] bg-panel p-5">
+    <section className="relative overflow-hidden rounded-lg border border-accentLine bg-panel p-5">
       <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brandPurple via-[#f1f1f1] to-brandOrange" />
       <img
         alt=""
@@ -452,7 +483,7 @@ function SeriesPanel({
               <Clock3 size={16} />
               {statusLabel}
             </div>
-            <p className="mt-3 text-5xl font-semibold tracking-normal">
+            <p className="mt-3 text-4xl font-semibold tracking-normal sm:text-5xl">
               {series.status === "break" ? formatDuration(breakRemaining) : `${series.wins}-${series.losses}`}
             </p>
             <p className="mt-2 text-sm text-muted">{detailLabel}</p>
@@ -464,7 +495,7 @@ function SeriesPanel({
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid gap-2 sm:grid-cols-3">
           <StatTile label="Series LP" value={formatLpDelta(series.lpDelta)} tone={getDeltaTone(series.lpDelta)} />
           <StatTile label="Best of" value={`BO${bestOf}`} />
           <StatTile label="Games" value={`${countedGames.length}/${bestOf}`} />
@@ -478,7 +509,7 @@ function SeriesPanel({
                 ? "border-good bg-good/15 text-good"
                 : match?.result === "loss"
                   ? "border-brandPurple bg-brandPurple/15 text-brandPurple"
-                  : "border-line bg-[#1b2027] text-muted";
+                  : "border-line bg-surfaceHigh text-muted";
 
             return (
               <div className={`h-24 rounded-lg border p-3 ${tone}`} key={index}>
@@ -508,7 +539,7 @@ function BreakScreen({
   const progress = getBreakProgress(series, breakRemaining);
 
   return (
-    <section className="relative overflow-hidden rounded-lg border border-[#34284a] bg-panel">
+    <section className="relative overflow-hidden rounded-lg border border-accentLine bg-panel">
       <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brandPurple via-[#f1f1f1] to-brandOrange" />
       <img
         alt=""
@@ -523,12 +554,12 @@ function BreakScreen({
               <Clock3 size={16} />
               Break Screen
             </div>
-            <p className="mt-3 text-6xl font-semibold tracking-normal">{formatDuration(breakRemaining)}</p>
+            <p className="mt-3 text-4xl font-semibold tracking-normal sm:text-6xl">{formatDuration(breakRemaining)}</p>
             <p className="mt-2 text-sm text-muted">
               {series.breakUntil ? `Queue unlocks ${formatDateTime(series.breakUntil)}` : "Queue is cooling down"}
             </p>
           </div>
-          <div className="rounded-md border border-line bg-[#1b2027] px-4 py-3 text-right">
+          <div className="rounded-md border border-line bg-surfaceHigh px-4 py-3 text-right">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">Last BO{bestOf}</p>
             <p className="mt-1 text-2xl font-semibold">
               {series.wins}-{series.losses}
@@ -536,11 +567,11 @@ function BreakScreen({
           </div>
         </div>
 
-        <div className="mt-6 h-2 overflow-hidden rounded-full bg-[#252a32]">
+        <div className="mt-6 h-2 overflow-hidden rounded-full bg-mutedSurface">
           <div className="h-full bg-brandOrange transition-[width]" style={{ width: `${progress}%` }} />
         </div>
 
-        <div className="mt-5 grid grid-cols-3 gap-2">
+        <div className="mt-5 grid gap-2 sm:grid-cols-3">
           <StatTile label="Series LP" value={formatLpDelta(series.lpDelta)} tone={getDeltaTone(series.lpDelta)} />
           <StatTile label="Games" value={`${getCountedSeriesGames(series.games).length}/${bestOf}`} />
           <StatTile label="Status" value="Locked" tone="bad" />
@@ -616,7 +647,7 @@ function SessionNoteEditor({
           <h2 className="font-semibold">Session Notes</h2>
         </div>
         <button
-          className="flex h-9 items-center gap-2 rounded-md border border-line bg-[#1b2027] px-3 text-sm text-muted hover:text-ink disabled:cursor-not-allowed disabled:text-muted/60"
+          className="flex h-9 items-center gap-2 rounded-md border border-line bg-surfaceHigh px-3 text-sm text-muted hover:text-ink disabled:cursor-not-allowed disabled:text-muted/60"
           disabled={!hasChanges || saving}
           onClick={() => void saveNote()}
           type="button"
@@ -626,7 +657,7 @@ function SessionNoteEditor({
         </button>
       </div>
       <textarea
-        className="mt-4 min-h-28 w-full resize-y rounded-md border border-line bg-[#101216] px-3 py-3 text-sm leading-6 text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brandOrange"
+        className="mt-4 min-h-28 w-full resize-y rounded-md border border-line bg-app px-3 py-3 text-sm leading-6 text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brandOrange"
         maxLength={2000}
         onBlur={() => void saveNote()}
         onChange={(event) => setDraft(event.currentTarget.value)}
@@ -670,7 +701,7 @@ function LpSummary({
           <h2 className="font-semibold">LP Tracker</h2>
           <p className="mt-1 text-sm text-muted">{rankedLabel(ranked)}</p>
         </div>
-        <div className="grid size-10 place-items-center rounded-lg border border-line bg-[#1b2027] text-brandOrange">
+        <div className="grid size-10 place-items-center rounded-lg border border-line bg-surfaceHigh text-brandOrange">
           <BarChart3 size={18} />
         </div>
       </div>
@@ -702,14 +733,14 @@ function TrendDashboard({
         <p className="text-sm text-muted">Last {Math.max(trends.sessionCount, trends.matchCount)} records</p>
       </div>
 
-      <div className="grid grid-cols-4 gap-2 border-b border-line p-5">
+      <div className="grid grid-cols-2 gap-2 border-b border-line p-5 lg:grid-cols-4">
         <StatTile label="Sessions" value={`${trends.sessionCount}`} />
         <StatTile label="Win Rate" value={formatPercent(trends.sessionWinRate)} tone={getRateTone(trends.sessionWinRate)} />
         <StatTile label="LP Total" value={formatLpDelta(trends.totalLp)} tone={getDeltaTone(trends.totalLp)} />
         <StatTile label="Top Role" value={formatRoleName(trends.roleStats[0]?.role)} />
       </div>
 
-      <div className="grid grid-cols-2 gap-5 p-5">
+      <div className="grid gap-5 p-5 md:grid-cols-2">
         <div className="min-w-0">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-semibold">LP Trend</h3>
@@ -727,7 +758,7 @@ function TrendDashboard({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-5 border-t border-line p-5">
+      <div className="grid gap-5 border-t border-line p-5 md:grid-cols-2">
         <div className="min-w-0">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-semibold">Champion Form</h3>
@@ -769,19 +800,19 @@ function LineGraph({ points }: { points: ChartPoint[] }) {
 
   return (
     <svg aria-label="LP trend graph" className="h-32 w-full" role="img" viewBox={`0 0 ${width} ${height}`}>
-      <line stroke="#2a3038" strokeWidth="1" x1={padding} x2={width - padding} y1={zeroY} y2={zeroY} />
+      <line stroke="rgb(var(--color-line))" strokeWidth="1" x1={padding} x2={width - padding} y1={zeroY} y2={zeroY} />
       <polyline
         fill="none"
         points={coordinates.map((point) => `${point.x},${point.y}`).join(" ")}
-        stroke="#ff9f1a"
+        stroke="rgb(var(--color-brand-orange))"
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth="3"
       />
       {coordinates.map((point) => (
         <g key={`${point.label}-${point.x}`}>
-          <circle cx={point.x} cy={point.y} fill="#15181d" r="4" stroke="#ff9f1a" strokeWidth="2" />
-          <text fill="#8d96a3" fontSize="9" textAnchor="middle" x={point.x} y={height - 2}>
+          <circle cx={point.x} cy={point.y} fill="rgb(var(--color-panel))" r="4" stroke="rgb(var(--color-brand-orange))" strokeWidth="2" />
+          <text fill="rgb(var(--color-muted))" fontSize="9" textAnchor="middle" x={point.x} y={height - 2}>
             {point.label}
           </text>
         </g>
@@ -814,9 +845,9 @@ function SessionResultGraph({ sessions }: { sessions: CompletedSession[] }) {
 
         return (
           <g key={session.id}>
-            <rect fill="#ec5f67" height={lossHeight} rx="3" width={barWidth} x={x} y={lossY} />
-            <rect fill="#27c07d" height={winHeight} rx="3" width={barWidth} x={x} y={winY} />
-            <text fill="#8d96a3" fontSize="9" textAnchor="middle" x={x + barWidth / 2} y={height - 2}>
+            <rect fill="rgb(var(--color-bad))" height={lossHeight} rx="3" width={barWidth} x={x} y={lossY} />
+            <rect fill="rgb(var(--color-good))" height={winHeight} rx="3" width={barWidth} x={x} y={winY} />
+            <text fill="rgb(var(--color-muted))" fontSize="9" textAnchor="middle" x={x + barWidth / 2} y={height - 2}>
               {session.wins}-{session.losses}
             </text>
           </g>
@@ -838,7 +869,7 @@ function ChampionBars({ champions }: { champions: ChampionTrend[] }) {
       {champions.map((champion) => (
         <div className="grid grid-cols-[130px_minmax(0,1fr)_76px] items-center gap-3" key={champion.name}>
           <p className="truncate text-sm font-medium">{champion.name}</p>
-          <div className="h-3 overflow-hidden rounded-full bg-[#252a32]">
+          <div className="h-3 overflow-hidden rounded-full bg-mutedSurface">
             <div
               className="h-full rounded-full bg-info"
               style={{ width: `${Math.max(8, (champion.games / maxGames) * 100)}%` }}
@@ -865,7 +896,7 @@ function RoleBars({ roles }: { roles: RoleTrend[] }) {
       {roles.map((role) => (
         <div className="grid grid-cols-[84px_minmax(0,1fr)_76px] items-center gap-3" key={role.role}>
           <p className="truncate text-sm font-medium">{formatRoleName(role.role)}</p>
-          <div className="h-3 overflow-hidden rounded-full bg-[#252a32]">
+          <div className="h-3 overflow-hidden rounded-full bg-mutedSurface">
             <div
               className="h-full rounded-full bg-brandOrange"
               style={{ width: `${Math.max(8, (role.games / maxGames) * 100)}%` }}
@@ -882,7 +913,7 @@ function RoleBars({ roles }: { roles: RoleTrend[] }) {
 
 function EmptyGraph({ label }: { label: string }) {
   return (
-    <div className="grid h-32 place-items-center rounded-md border border-dashed border-line bg-[#101216] text-sm text-muted">
+    <div className="grid h-32 place-items-center rounded-md border border-dashed border-line bg-app text-sm text-muted">
       {label}
     </div>
   );
@@ -910,7 +941,7 @@ function SessionHistory({
         <div className="divide-y divide-line">
           {sessions.slice(0, 6).map((session) => (
             <button
-              className={`flex min-h-[72px] w-full items-center justify-between gap-3 px-5 text-left hover:bg-[#1b2027] ${
+              className={`flex min-h-[72px] w-full items-center justify-between gap-3 px-5 text-left hover:bg-surfaceHigh ${
                 selectedSessionId === session.id ? "bg-brandOrange/10" : ""
               }`}
               key={session.id}
@@ -1080,7 +1111,7 @@ function StatTile({
   const toneClass = tone === "good" ? "text-good" : tone === "bad" ? "text-bad" : "text-ink";
 
   return (
-    <div className="rounded-md border border-line bg-[#1b2027] px-3 py-2">
+    <div className="rounded-md border border-line bg-surfaceHigh px-3 py-2">
       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">{label}</p>
       <p className={`mt-1 text-lg font-semibold ${toneClass}`}>{value}</p>
     </div>
@@ -1112,7 +1143,7 @@ function MatchList({
           >
             <img
               alt=""
-              className="size-12 shrink-0 rounded-md border border-line bg-[#101216]"
+              className="size-12 shrink-0 rounded-md border border-line bg-app"
               src={window.tiltbreaker.assetUrl(`/lol-game-data/assets/v1/champion-icons/${match.championId}.png`)}
             />
             <div className="min-w-0 flex-1">
@@ -1150,7 +1181,7 @@ function MatchList({
 function ProfileIcon({ profileIconId }: { profileIconId?: number }) {
   if (!profileIconId) {
     return (
-      <div className="grid size-14 shrink-0 place-items-center rounded-lg border border-line bg-[#1b2027] text-muted">
+      <div className="grid size-14 shrink-0 place-items-center rounded-lg border border-line bg-surfaceHigh text-muted">
         <ShieldCheck size={22} />
       </div>
     );
@@ -1159,7 +1190,7 @@ function ProfileIcon({ profileIconId }: { profileIconId?: number }) {
   return (
     <img
       alt=""
-      className="size-14 shrink-0 rounded-lg border border-line bg-[#1b2027]"
+      className="size-14 shrink-0 rounded-lg border border-line bg-surfaceHigh"
       src={window.tiltbreaker.assetUrl(`/lol-game-data/assets/v1/profile-icons/${profileIconId}.jpg`)}
     />
   );
@@ -1184,7 +1215,7 @@ function StatusLine({
   }[tone];
 
   return (
-    <div className="flex min-h-12 items-center justify-between rounded-lg border border-line bg-[#181c22] px-3">
+    <div className="flex min-h-12 items-center justify-between rounded-lg border border-line bg-surface px-3">
       <div className="flex min-w-0 items-center gap-2 text-muted">
         <span className={toneClass}>{icon}</span>
         <span className="text-sm">{label}</span>
@@ -1239,12 +1270,12 @@ function resultBadgeClass(result: MatchSummary["result"]) {
     return "bg-warn/15 text-warn";
   }
 
-  return "bg-[#252a32] text-muted";
+  return "bg-mutedSurface text-muted";
 }
 
 function roleBadgeClass(role: MatchRole) {
   if (role === "unknown") {
-    return "bg-[#252a32] text-muted";
+    return "bg-mutedSurface text-muted";
   }
 
   return "bg-info/15 text-info";
