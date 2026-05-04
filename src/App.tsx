@@ -26,6 +26,7 @@ import type {
   AppSnapshot,
   CompletedSession,
   LpDayState,
+  MatchRole,
   MatchSummary,
   RankedSnapshot,
   SeriesBestOf,
@@ -71,6 +72,12 @@ interface ChartPoint {
 interface ChampionTrend {
   games: number;
   name: string;
+  winRate?: number;
+}
+
+interface RoleTrend {
+  games: number;
+  role: MatchRole;
   winRate?: number;
 }
 
@@ -699,7 +706,7 @@ function TrendDashboard({
         <StatTile label="Sessions" value={`${trends.sessionCount}`} />
         <StatTile label="Win Rate" value={formatPercent(trends.sessionWinRate)} tone={getRateTone(trends.sessionWinRate)} />
         <StatTile label="LP Total" value={formatLpDelta(trends.totalLp)} tone={getDeltaTone(trends.totalLp)} />
-        <StatTile label="Avg KDA" value={trends.averageKda ? trends.averageKda.toFixed(2) : "--"} />
+        <StatTile label="Top Role" value={formatRoleName(trends.roleStats[0]?.role)} />
       </div>
 
       <div className="grid grid-cols-2 gap-5 p-5">
@@ -720,12 +727,22 @@ function TrendDashboard({
         </div>
       </div>
 
-      <div className="border-t border-line p-5">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold">Champion Form</h3>
-          <p className="text-xs text-muted">Recent matches</p>
+      <div className="grid grid-cols-2 gap-5 border-t border-line p-5">
+        <div className="min-w-0">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold">Champion Form</h3>
+            <p className="text-xs text-muted">Recent matches</p>
+          </div>
+          <ChampionBars champions={trends.championStats} />
         </div>
-        <ChampionBars champions={trends.championStats} />
+
+        <div className="min-w-0">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold">Role Form</h3>
+            <p className="text-xs text-muted">{trends.averageKda ? `${trends.averageKda.toFixed(2)} avg KDA` : "Recent matches"}</p>
+          </div>
+          <RoleBars roles={trends.roleStats} />
+        </div>
       </div>
     </section>
   );
@@ -819,7 +836,7 @@ function ChampionBars({ champions }: { champions: ChampionTrend[] }) {
   return (
     <div className="space-y-3">
       {champions.map((champion) => (
-        <div className="grid grid-cols-[130px_minmax(0,1fr)_64px] items-center gap-3" key={champion.name}>
+        <div className="grid grid-cols-[130px_minmax(0,1fr)_76px] items-center gap-3" key={champion.name}>
           <p className="truncate text-sm font-medium">{champion.name}</p>
           <div className="h-3 overflow-hidden rounded-full bg-[#252a32]">
             <div
@@ -827,7 +844,36 @@ function ChampionBars({ champions }: { champions: ChampionTrend[] }) {
               style={{ width: `${Math.max(8, (champion.games / maxGames) * 100)}%` }}
             />
           </div>
-          <p className="text-right text-xs text-muted">{formatPercent(champion.winRate)}</p>
+          <p className="text-right text-xs text-muted">
+            {champion.games}G · {formatPercent(champion.winRate)}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RoleBars({ roles }: { roles: RoleTrend[] }) {
+  if (!roles.length) {
+    return <div className="grid min-h-24 place-items-center text-sm text-muted">No role trend yet</div>;
+  }
+
+  const maxGames = Math.max(...roles.map((role) => role.games));
+
+  return (
+    <div className="space-y-3">
+      {roles.map((role) => (
+        <div className="grid grid-cols-[84px_minmax(0,1fr)_76px] items-center gap-3" key={role.role}>
+          <p className="truncate text-sm font-medium">{formatRoleName(role.role)}</p>
+          <div className="h-3 overflow-hidden rounded-full bg-[#252a32]">
+            <div
+              className="h-full rounded-full bg-brandOrange"
+              style={{ width: `${Math.max(8, (role.games / maxGames) * 100)}%` }}
+            />
+          </div>
+          <p className="text-right text-xs text-muted">
+            {role.games}G · {formatPercent(role.winRate)}
+          </p>
         </div>
       ))}
     </div>
@@ -955,6 +1001,7 @@ function buildTrendDashboard(sessions: CompletedSession[], recentMatches: MatchS
     lpPoints,
     matchCount: matches.length,
     resultSessions,
+    roleStats: getRoleTrends(matches),
     sessionCount: completedSessions.length,
     sessionWinRate: completedSessions.length ? sessionWins / completedSessions.length : undefined,
     totalLp
@@ -995,6 +1042,30 @@ function getChampionTrends(matches: MatchSummary[]): ChampionTrend[] {
     }))
     .sort((a, b) => b.games - a.games || (b.winRate ?? 0) - (a.winRate ?? 0))
     .slice(0, 5);
+}
+
+function getRoleTrends(matches: MatchSummary[]): RoleTrend[] {
+  const roleMap = new Map<MatchRole, { games: number; wins: number }>();
+
+  for (const match of matches) {
+    if (match.role === "unknown") {
+      continue;
+    }
+
+    const current = roleMap.get(match.role) ?? { games: 0, wins: 0 };
+    roleMap.set(match.role, {
+      games: current.games + 1,
+      wins: current.wins + (match.result === "win" ? 1 : 0)
+    });
+  }
+
+  return [...roleMap.entries()]
+    .map(([role, stats]) => ({
+      games: stats.games,
+      role,
+      winRate: stats.games ? stats.wins / stats.games : undefined
+    }))
+    .sort((a, b) => b.games - a.games || (b.winRate ?? 0) - (a.winRate ?? 0));
 }
 
 function StatTile({
@@ -1049,6 +1120,9 @@ function MatchList({
                 <p className="truncate font-semibold">{match.championName}</p>
                 <span className={`rounded px-1.5 py-0.5 text-xs font-semibold ${resultBadgeClass(match.result)}`}>
                   {resultLabel(match.result)}
+                </span>
+                <span className={`rounded px-1.5 py-0.5 text-xs font-semibold ${roleBadgeClass(match.role)}`}>
+                  {formatRoleName(match.role)}
                 </span>
               </div>
               <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-sm text-muted">
@@ -1166,6 +1240,38 @@ function resultBadgeClass(result: MatchSummary["result"]) {
   }
 
   return "bg-[#252a32] text-muted";
+}
+
+function roleBadgeClass(role: MatchRole) {
+  if (role === "unknown") {
+    return "bg-[#252a32] text-muted";
+  }
+
+  return "bg-info/15 text-info";
+}
+
+function formatRoleName(role?: MatchRole) {
+  if (role === "top") {
+    return "Top";
+  }
+
+  if (role === "jungle") {
+    return "Jungle";
+  }
+
+  if (role === "middle") {
+    return "Mid";
+  }
+
+  if (role === "bottom") {
+    return "Bot";
+  }
+
+  if (role === "support") {
+    return "Support";
+  }
+
+  return "Unknown";
 }
 
 function getCountedSeriesGames(matches: MatchSummary[]) {

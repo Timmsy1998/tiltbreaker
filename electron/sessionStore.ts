@@ -5,6 +5,7 @@ import type {
   AppSnapshot,
   CompletedSession,
   LpDayState,
+  MatchRole,
   MatchSummary,
   RankedSnapshot,
   SeriesState,
@@ -518,6 +519,10 @@ function mergeMatchStats(stored: MatchSummary, incoming: MatchSummary): MatchSum
     merged.result = storedMatch.result;
   }
 
+  if (incomingMatch.role === "unknown" && storedMatch.role !== "unknown") {
+    merged.role = storedMatch.role;
+  }
+
   if (isFallbackChampionName(incomingMatch.championName) && !isFallbackChampionName(storedMatch.championName)) {
     merged.championName = storedMatch.championName;
   }
@@ -589,8 +594,20 @@ function hydrateMatch(match: MatchSummary): MatchSummary {
     gold: normalizeOptionalStat(match.gold),
     kdaRatio: typeof match.kdaRatio === "number" ? match.kdaRatio : getKdaRatio(kills, deaths, assists),
     kills,
-    result: getHydratedResult(match.result, durationSeconds)
+    result: getHydratedResult(match.result, durationSeconds),
+    role: normalizeRole(match.role)
   };
+}
+
+function normalizeRole(role: unknown): MatchRole {
+  return role === "top" ||
+    role === "jungle" ||
+    role === "middle" ||
+    role === "bottom" ||
+    role === "support" ||
+    role === "unknown"
+    ? role
+    : "unknown";
 }
 
 function getHydratedResult(result: unknown, durationSeconds: number): MatchSummary["result"] {

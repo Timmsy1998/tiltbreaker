@@ -14,6 +14,7 @@ export type LcuPhase =
 
 export type QueueGate = "open" | "closed" | "unavailable";
 export type SeriesBestOf = 3 | 5;
+export type MatchRole = "top" | "jungle" | "middle" | "bottom" | "support" | "unknown";
 
 export interface SummonerInfo {
   accountId?: number;
@@ -50,6 +51,7 @@ export interface MatchSummary {
   queueId?: number;
   queueName?: string;
   result: "win" | "loss" | "remake" | "unknown";
+  role: MatchRole;
   cs?: number;
   gold?: number;
 }

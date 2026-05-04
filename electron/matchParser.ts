@@ -1,5 +1,5 @@
 import { getQueueName } from "./queueRules";
-import type { MatchSummary, SummonerInfo } from "./types";
+import type { MatchRole, MatchSummary, SummonerInfo } from "./types";
 
 const REMAKE_MAX_DURATION_SECONDS = 5 * 60;
 
@@ -25,8 +25,11 @@ interface LcuParticipant {
   accountId?: number;
   championId?: number;
   championName?: string;
+  individualPosition?: string;
+  lane?: string;
   participantId?: number;
   puuid?: string;
+  role?: string;
   summonerId?: number;
   summonerName?: string;
   stats?: {
@@ -39,6 +42,11 @@ interface LcuParticipant {
     numDeaths?: LcuNumericStat;
     totalMinionsKilled?: LcuNumericStat;
     win?: boolean | string | number;
+  };
+  teamPosition?: string;
+  timeline?: {
+    lane?: string;
+    role?: string;
   };
 }
 
@@ -113,8 +121,75 @@ function parseGame(
     queueId,
     queueName: getQueueName(queueId),
     result: parseResult(stats.win, durationSeconds),
+    role: parseRole(participant),
     cs: normalizeNumber(stats.totalMinionsKilled) + normalizeNumber(stats.neutralMinionsKilled)
   };
+}
+
+function parseRole(participant: LcuParticipant): MatchRole {
+  const roleCandidates = [
+    participant.teamPosition,
+    participant.individualPosition,
+    getTimelineRole(participant.timeline?.lane, participant.timeline?.role),
+    getTimelineRole(participant.lane, participant.role),
+    participant.lane,
+    participant.role
+  ];
+
+  for (const candidate of roleCandidates) {
+    const role = normalizeRole(candidate);
+
+    if (role !== "unknown") {
+      return role;
+    }
+  }
+
+  return "unknown";
+}
+
+function getTimelineRole(lane?: string, role?: string) {
+  const normalizedLane = lane?.trim().toUpperCase();
+  const normalizedRole = role?.trim().toUpperCase();
+
+  if (normalizedLane === "BOTTOM" && normalizedRole === "DUO_SUPPORT") {
+    return "SUPPORT";
+  }
+
+  if (normalizedLane === "BOTTOM" && (normalizedRole === "DUO_CARRY" || normalizedRole === "DUO")) {
+    return "BOTTOM";
+  }
+
+  return normalizedLane;
+}
+
+function normalizeRole(value?: string): MatchRole {
+  const normalized = value?.trim().toUpperCase();
+
+  if (!normalized || normalized === "NONE" || normalized === "INVALID" || normalized === "UNSELECTED") {
+    return "unknown";
+  }
+
+  if (normalized === "TOP") {
+    return "top";
+  }
+
+  if (normalized === "JUNGLE") {
+    return "jungle";
+  }
+
+  if (normalized === "MID" || normalized === "MIDDLE") {
+    return "middle";
+  }
+
+  if (normalized === "BOT" || normalized === "BOTTOM" || normalized === "ADC" || normalized === "DUO_CARRY") {
+    return "bottom";
+  }
+
+  if (normalized === "UTILITY" || normalized === "SUPPORT" || normalized === "DUO_SUPPORT") {
+    return "support";
+  }
+
+  return "unknown";
 }
 
 function findParticipantId(game: LcuGame, summoner: SummonerInfo) {
