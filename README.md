@@ -11,9 +11,15 @@ Start a BO3 or BO5 session, play your Summoner's Rift games, then take a one or 
 - BO3 and BO5 session tracking
 - One or two hour break windows after a session ends
 - Queue guard for Summoner's Rift matchmaking and ready checks
+- Tray notifications for break starts, queue blocks, and break completion
+- Dedicated break screen with countdown progress
+- Session notes for active, break, and completed sessions
+- Trend dashboard with LP, result, and champion graphs
 - Recent match history with champion, queue, KDA, CS, gold, and result
 - Ranked LP tracking for the current session and day
 - Completed session history
+- Optional start with Windows
+- Discord contact button for the developer
 - Manual lockfile picker when League Client auto-detection fails
 
 ARAM, TFT, Arena, and other non-Summoner's Rift queues are left alone by the queue guard.
@@ -62,6 +68,8 @@ The installer is written to `release/`. The unpacked executable is written to `r
 6. Play the session.
 
 When the session finishes, TiltBreaker starts the break timer and closes the Summoner's Rift gate until the break is over. You can still play non-Summoner's Rift modes during that time.
+
+Use `Session Notes` to save local notes against the current session or a past session. Use `Contact Developer` to open Discord for `fatbaldbrit`.
 
 If the app cannot find the League Client automatically, click `Lockfile` and select the client's `lockfile` manually.
 

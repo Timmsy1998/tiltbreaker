@@ -12,6 +12,9 @@ const api = {
   clearBreak() {
     return ipcRenderer.invoke("clear-break") as Promise<AppSnapshot>;
   },
+  contactDeveloper() {
+    return ipcRenderer.invoke("contact-developer") as Promise<void>;
+  },
   endSeries() {
     return ipcRenderer.invoke("end-series") as Promise<AppSnapshot>;
   },
@@ -34,6 +37,12 @@ const api = {
   },
   updateSettings(settings: Partial<TiltBreakerSettings>) {
     return ipcRenderer.invoke("update-settings", settings) as Promise<AppSnapshot>;
+  },
+  updateSeriesNote(note: string) {
+    return ipcRenderer.invoke("update-series-note", note) as Promise<AppSnapshot>;
+  },
+  updateCompletedSessionNote(sessionId: string, note: string) {
+    return ipcRenderer.invoke("update-completed-session-note", sessionId, note) as Promise<AppSnapshot>;
   }
 };
 

@@ -82,6 +82,7 @@ export interface SeriesState {
   endedAt?: number;
   games: MatchSummary[];
   losses: number;
+  note?: string;
   lpCurrent?: RankedSnapshot;
   lpDelta?: number;
   lpStart?: RankedSnapshot;
@@ -97,6 +98,7 @@ export interface CompletedSession {
   games: MatchSummary[];
   id: string;
   losses: number;
+  note?: string;
   lpDelta?: number;
   lpEnd?: RankedSnapshot;
   lpStart?: RankedSnapshot;
@@ -106,9 +108,11 @@ export interface CompletedSession {
 }
 
 export interface TiltBreakerSettings {
+  autoStartEnabled: boolean;
   bestOf: SeriesBestOf;
   breakMinutes: number;
   lockfilePath?: string;
+  notificationsEnabled: boolean;
   queueGuardEnabled: boolean;
 }
 

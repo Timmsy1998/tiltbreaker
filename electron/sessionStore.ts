@@ -22,6 +22,7 @@ interface PersistedState {
 
 const SESSION_MATCH_START_GRACE_MS = 15 * 60 * 1000;
 const REMAKE_MAX_DURATION_SECONDS = 5 * 60;
+const MAX_NOTE_LENGTH = 2000;
 
 const defaultState: PersistedState = {
   completedSessions: [],
@@ -33,8 +34,10 @@ const defaultState: PersistedState = {
     wins: 0
   },
   settings: {
+    autoStartEnabled: false,
     bestOf: 3,
     breakMinutes: 60,
+    notificationsEnabled: true,
     queueGuardEnabled: true
   }
 };
@@ -124,6 +127,7 @@ export class SessionStore {
       endedAt: undefined,
       games: [],
       losses: 0,
+      note: "",
       lpStart: this.state.ranked,
       startedAt: now,
       status: "active",
@@ -162,6 +166,59 @@ export class SessionStore {
       ...settings
     };
     this.save();
+  }
+
+  updateSeriesNote(note: string) {
+    if (!this.state.series.startedAt) {
+      return false;
+    }
+
+    const normalizedNote = normalizeNote(note);
+    this.state.series = {
+      ...this.state.series,
+      note: normalizedNote
+    };
+
+    this.state.completedSessions = this.state.completedSessions.map((session) =>
+      session.startedAt === this.state.series.startedAt ? { ...session, note: normalizedNote } : session
+    );
+
+    this.save();
+    return true;
+  }
+
+  updateCompletedSessionNote(sessionId: string, note: string) {
+    const normalizedNote = normalizeNote(note);
+    let updatedSession: CompletedSession | undefined;
+
+    this.state.completedSessions = this.state.completedSessions.map((session) => {
+      if (session.id !== sessionId) {
+        return session;
+      }
+
+      updatedSession = {
+        ...session,
+        note: normalizedNote
+      };
+      return updatedSession;
+    });
+
+    if (!updatedSession) {
+      return false;
+    }
+
+    if (
+      this.state.series.startedAt === updatedSession.startedAt &&
+      this.state.series.endedAt === updatedSession.endedAt
+    ) {
+      this.state.series = {
+        ...this.state.series,
+        note: normalizedNote
+      };
+    }
+
+    this.save();
+    return true;
   }
 
   updateRanked(ranked: RankedSnapshot | undefined) {
@@ -301,6 +358,7 @@ export class SessionStore {
       games,
       id: `${startedAt}-${endedAt}`,
       losses,
+      note: normalizeNote(this.state.series.note),
       lpDelta,
       lpEnd,
       lpStart: this.state.series.lpStart,
@@ -489,6 +547,7 @@ function hydrateCompletedSessions(sessions: CompletedSession[]) {
       ...session,
       games,
       losses,
+      note: normalizeNote(session.note),
       result: getSessionResult(session.bestOf, wins, losses),
       wins
     };
@@ -502,8 +561,13 @@ function hydrateSeries(series: SeriesState): SeriesState {
     ...series,
     games,
     losses: countLosses(games),
+    note: normalizeNote(series.note),
     wins: countWins(games)
   };
+}
+
+function normalizeNote(note: unknown) {
+  return typeof note === "string" ? note.slice(0, MAX_NOTE_LENGTH) : "";
 }
 
 function hydrateMatches(matches: MatchSummary[]) {
@@ -639,6 +703,7 @@ function getSeriesFromCompletedBreak(session: CompletedSession): SeriesState {
     endedAt: session.endedAt,
     games: session.games,
     losses: session.losses,
+    note: session.note ?? "",
     lpCurrent: session.lpEnd,
     lpDelta: session.lpDelta,
     lpStart: session.lpStart,

@@ -8,6 +8,8 @@ import {
   nativeTheme,
   protocol,
   ipcMain,
+  Notification,
+  shell,
   type OpenDialogOptions
 } from "electron";
 import { join } from "node:path";
@@ -55,6 +57,7 @@ protocol.registerSchemesAsPrivileged([
 const lcu = new LcuClient();
 const POLL_INTERVAL_MS = 2000;
 const MATCH_HISTORY_QUERY = "begIndex=0&endIndex=20";
+const DISCORD_DEVELOPER_URL = "https://discord.com/users/1401894788172611594";
 const MATCH_HISTORY_OPTIONS = {
   headers: {
     "Cache-Control": "no-cache",
@@ -71,6 +74,15 @@ let isQuitting = false;
 let championNames = new Map<number, string>();
 let championNamesLoadedAt = 0;
 let polling = false;
+let notificationState: {
+  breakActive: boolean;
+  breakUntil?: number;
+  initialized: boolean;
+  lastBlockedAt?: number;
+} = {
+  breakActive: false,
+  initialized: false
+};
 
 async function createWindow() {
   mainWindow = new BrowserWindow({
@@ -115,6 +127,8 @@ app.whenReady().then(async () => {
     ...queueGuard,
     enabled: store.settings.queueGuardEnabled
   };
+  syncAutoStartSetting();
+  setNotificationBaseline(snapshot());
 
   registerIpc();
   registerAssetProtocol();
@@ -183,27 +197,42 @@ function getIconPath(type: "ico" | "png") {
   return join(__dirname, `../build/icon.${type}`);
 }
 
+function syncAutoStartSetting() {
+  if (process.platform !== "win32") {
+    return;
+  }
+
+  try {
+    app.setLoginItemSettings({
+      openAtLogin: store.settings.autoStartEnabled,
+      openAsHidden: true
+    });
+  } catch {
+    // Windows login item APIs can fail in development shells; keep the app usable.
+  }
+}
+
 function registerIpc() {
-  ipcMain.handle("snapshot", () => snapshot());
+  ipcMain.handle("snapshot", () => snapshotWithNotifications());
 
   ipcMain.handle("start-series", () => {
     store.startSeries();
-    return snapshot();
+    return snapshotWithNotifications();
   });
 
   ipcMain.handle("end-series", () => {
     store.endSeries();
-    return snapshot();
+    return snapshotWithNotifications();
   });
 
   ipcMain.handle("clear-break", () => {
     store.clearBreak();
-    return snapshot();
+    return snapshotWithNotifications();
   });
 
   ipcMain.handle("cancel-queue", async () => {
     await cancelQueue("Manual queue stop");
-    return snapshot();
+    return snapshotWithNotifications();
   });
 
   ipcMain.handle("update-settings", (_event, settings: Partial<TiltBreakerSettings>) => {
@@ -213,7 +242,25 @@ function registerIpc() {
       ...queueGuard,
       enabled: store.settings.queueGuardEnabled
     };
-    return snapshot();
+    if (typeof settings.autoStartEnabled === "boolean") {
+      syncAutoStartSetting();
+    }
+
+    return snapshotWithNotifications();
+  });
+
+  ipcMain.handle("update-series-note", (_event, note: string) => {
+    store.updateSeriesNote(note);
+    return snapshotWithNotifications();
+  });
+
+  ipcMain.handle("update-completed-session-note", (_event, sessionId: string, note: string) => {
+    store.updateCompletedSessionNote(sessionId, note);
+    return snapshotWithNotifications();
+  });
+
+  ipcMain.handle("contact-developer", async () => {
+    await shell.openExternal(DISCORD_DEVELOPER_URL);
   });
 
   ipcMain.handle("select-lockfile", async () => {
@@ -226,12 +273,12 @@ function registerIpc() {
       : await dialog.showOpenDialog(dialogOptions);
 
     if (result.canceled || !result.filePaths[0]) {
-      return snapshot();
+      return snapshotWithNotifications();
     }
 
     store.updateSettings({ lockfilePath: result.filePaths[0] });
     lcu.setPreferredLockfilePath(result.filePaths[0]);
-    return snapshot();
+    return snapshotWithNotifications();
   });
 }
 
@@ -377,9 +424,14 @@ async function cancelQueue(reason: string) {
     lcu.requestJson<void>("/lol-matchmaking/v1/ready-check/decline", { method: "POST" })
   ]);
 
+  const now = Date.now();
+  if (queueGuard.lastBlockedReason === reason && queueGuard.lastBlockedAt && now - queueGuard.lastBlockedAt < 15_000) {
+    return;
+  }
+
   queueGuard = {
     ...queueGuard,
-    lastBlockedAt: Date.now(),
+    lastBlockedAt: now,
     lastBlockedReason: reason
   };
 }
@@ -412,12 +464,101 @@ function snapshot(): AppSnapshot {
   });
 }
 
+function snapshotWithNotifications() {
+  const nextSnapshot = snapshot();
+  applyTrayNotifications(nextSnapshot);
+  return nextSnapshot;
+}
+
 function pushSnapshot() {
-  mainWindow?.webContents.send("snapshot", snapshot());
+  mainWindow?.webContents.send("snapshot", snapshotWithNotifications());
 }
 
 function normalizeNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function setNotificationBaseline(nextSnapshot: AppSnapshot) {
+  notificationState = {
+    breakActive: isSnapshotBreakActive(nextSnapshot),
+    breakUntil: nextSnapshot.series.breakUntil,
+    initialized: true,
+    lastBlockedAt: nextSnapshot.queueGuard.lastBlockedAt
+  };
+}
+
+function applyTrayNotifications(nextSnapshot: AppSnapshot) {
+  const breakActive = isSnapshotBreakActive(nextSnapshot);
+  const breakUntil = breakActive ? nextSnapshot.series.breakUntil : undefined;
+
+  if (!notificationState.initialized) {
+    setNotificationBaseline(nextSnapshot);
+    return;
+  }
+
+  if (breakActive && (!notificationState.breakActive || notificationState.breakUntil !== breakUntil)) {
+    showTrayNotification(
+      "Break started",
+      `Summoner's Rift is locked until ${formatNotificationTime(breakUntil)}.`
+    );
+  }
+
+  if (
+    !breakActive &&
+    notificationState.breakActive &&
+    typeof notificationState.breakUntil === "number" &&
+    notificationState.breakUntil <= nextSnapshot.now
+  ) {
+    showTrayNotification("Break complete", "Summoner's Rift queue is available again.");
+  }
+
+  if (
+    typeof nextSnapshot.queueGuard.lastBlockedAt === "number" &&
+    nextSnapshot.queueGuard.lastBlockedAt !== notificationState.lastBlockedAt
+  ) {
+    showTrayNotification("Queue stopped", nextSnapshot.queueGuard.lastBlockedReason ?? "Queue guard blocked the queue.");
+  }
+
+  notificationState = {
+    breakActive,
+    breakUntil,
+    initialized: true,
+    lastBlockedAt: nextSnapshot.queueGuard.lastBlockedAt
+  };
+}
+
+function isSnapshotBreakActive(nextSnapshot: AppSnapshot) {
+  return (
+    nextSnapshot.series.status === "break" &&
+    typeof nextSnapshot.series.breakUntil === "number" &&
+    nextSnapshot.series.breakUntil > nextSnapshot.now
+  );
+}
+
+function showTrayNotification(title: string, body: string) {
+  if (!store.settings.notificationsEnabled || !Notification.isSupported()) {
+    return;
+  }
+
+  const notification = new Notification({
+    body,
+    icon: getIconPath("png"),
+    title
+  });
+
+  notification.on("click", showMainWindow);
+  notification.show();
+}
+
+function formatNotificationTime(timestamp?: number) {
+  if (!timestamp) {
+    return "the end of the break";
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(timestamp);
 }
 
 async function getChampionNames() {
